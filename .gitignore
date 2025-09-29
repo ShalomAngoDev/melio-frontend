@@ -100,3 +100,4 @@ temp/
 # Capacitor
 android/
 ios/
+.vercel

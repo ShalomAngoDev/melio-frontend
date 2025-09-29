@@ -12,10 +12,10 @@
   "env": {
     "VITE_API_BASE_URL": "https://web-production-39a0b.up.railway.app/api/v1"
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
