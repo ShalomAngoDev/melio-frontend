@@ -1,22 +1,21 @@
-name: Deploy to GitHub Pages
+# GitHub Actions désactivé - Utilisation de Vercel pour le déploiement
+# Vercel est configuré et fonctionne parfaitement
+# 
+# Pour déployer manuellement :
+# 1. cd web
+# 2. npx vercel --prod --yes
+#
+# URL de production : https://web-cibtk39mt-shalomdevs-projects.vercel.app
+
+name: Deploy to GitHub Pages (DISABLED)
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+  workflow_dispatch:  # Seulement manuel pour éviter les erreurs
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
+    if: false  # Désactivé
     
     steps:
     - name: Checkout
@@ -35,16 +34,5 @@ jobs:
       env:
         VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://web-production-39a0b.up.railway.app/api/v1' }}
         
-    - name: Setup Pages
-      uses: actions/configure-pages@v4
-      with:
-        enablement: true
-      
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: ./dist
-        
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
+    - name: Info
+      run: echo "GitHub Actions désactivé - Utilisez Vercel pour le déploiement"
