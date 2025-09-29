@@ -24,15 +24,30 @@ export default function LoginScreen({ onShowAdminLogin }: LoginScreenProps) {
     setIsLoading(true);
     setError('');
 
-    const success = await agentLogin(schoolCode.toUpperCase(), email, password);
-    
-    if (!success) {
-      const errorMsg = 'Code école, email ou mot de passe incorrect';
+    try {
+      await agentLogin(schoolCode.toUpperCase(), email, password);
+      // Si on arrive ici, la connexion a réussi
+      showSuccess('Connexion réussie !');
+    } catch (err: any) {
+      console.error('Erreur de connexion agent:', err);
+      
+      // Gérer différents types d'erreurs
+      let errorMsg = 'Erreur de connexion. Veuillez réessayer.';
+      
+      if (err.response?.status === 401) {
+        errorMsg = 'Code école, email ou mot de passe incorrect';
+      } else if (err.response?.status === 500) {
+        errorMsg = 'Erreur du serveur. Veuillez réessayer plus tard.';
+      } else if (err.message?.includes('Network Error')) {
+        errorMsg = 'Erreur de connexion. Vérifiez votre connexion internet.';
+      } else if (err.response?.data?.message) {
+        errorMsg = err.response.data.message;
+      }
+      
       setError(errorMsg);
       showError(errorMsg);
+    } finally {
       setIsLoading(false);
-    } else {
-      showSuccess('Connexion réussie !');
     }
   };
 

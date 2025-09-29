@@ -110,9 +110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Agent login error:', error);
-      return false;
+      // Propager l'erreur pour que le composant puisse l'afficher
+      throw error;
     }
   };
 
@@ -136,9 +137,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Admin login error:', error);
-      return false;
+      // Propager l'erreur pour que le composant puisse l'afficher
+      throw error;
     }
   };
 

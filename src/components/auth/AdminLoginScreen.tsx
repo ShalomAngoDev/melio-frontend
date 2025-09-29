@@ -26,12 +26,21 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
     setError('');
 
     try {
-      const success = await adminLogin(email.trim(), password);
-      if (!success) {
+      await adminLogin(email.trim(), password);
+      // Si on arrive ici, la connexion a réussi
+    } catch (err: any) {
+      console.error('Erreur de connexion admin:', err);
+      
+      // Gérer différents types d'erreurs
+      if (err.response?.status === 401) {
         setError('Email ou mot de passe incorrect');
+      } else if (err.response?.status === 500) {
+        setError('Erreur du serveur. Veuillez réessayer plus tard.');
+      } else if (err.message?.includes('Network Error')) {
+        setError('Erreur de connexion. Vérifiez votre connexion internet.');
+      } else {
+        setError(err.response?.data?.message || 'Erreur de connexion. Veuillez réessayer.');
       }
-    } catch (err) {
-      setError('Erreur de connexion');
     } finally {
       setIsLoading(false);
     }
