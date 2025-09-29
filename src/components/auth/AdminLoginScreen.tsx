@@ -14,26 +14,39 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showLogs, setShowLogs] = useState(false);
+
+  // Fonction pour sauvegarder les logs
+  const saveLog = (message: string, data?: any) => {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] ${message}${data ? ' - ' + JSON.stringify(data) : ''}`;
+    console.log(logEntry);
+    
+    // Sauvegarder dans localStorage
+    const existingLogs = localStorage.getItem('debug_logs') || '';
+    const newLogs = existingLogs + '\n' + logEntry;
+    localStorage.setItem('debug_logs', newLogs);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('📝 Admin form submitted');
+    saveLog('📝 Admin form submitted');
     
     if (!email.trim() || !password.trim()) {
       setError('Veuillez saisir votre email et mot de passe');
       return;
     }
 
-    console.log('🔄 Starting admin login process');
+    saveLog('🔄 Starting admin login process');
     setIsLoading(true);
     setError('');
 
     try {
       await adminLogin(email.trim(), password);
-      console.log('✅ Admin login successful in component');
+      saveLog('✅ Admin login successful in component');
       // Si on arrive ici, la connexion a réussi
     } catch (err: any) {
-      console.error('❌ Erreur de connexion admin:', err);
+      saveLog('❌ Erreur de connexion admin', err);
       
       // Gérer différents types d'erreurs
       let errorMessage = 'Erreur de connexion. Veuillez réessayer.';
@@ -57,28 +70,28 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       
       // Afficher l'erreur et empêcher le rechargement
       setError(errorMessage);
-      console.log('❌ Error set:', errorMessage);
+      saveLog('❌ Error set', errorMessage);
       
       // Logs ralentis pour débogage
-      console.log('🛑 STOPPING HERE - Error displayed, should not reload');
-      console.log('🛑 Current state should be: showAdminLogin=true, user=null');
-      console.log('🛑 ERROR MESSAGE:', errorMessage);
-      console.log('🛑 ERROR OBJECT:', err);
-      console.log('🛑 ERROR RESPONSE:', err.response);
-      console.log('🛑 ERROR RESPONSE DATA:', err.response?.data);
-      console.log('🛑 ERROR RESPONSE STATUS:', err.response?.status);
+      saveLog('🛑 STOPPING HERE - Error displayed, should not reload');
+      saveLog('🛑 Current state should be: showAdminLogin=true, user=null');
+      saveLog('🛑 ERROR MESSAGE', errorMessage);
+      saveLog('🛑 ERROR OBJECT', err);
+      saveLog('🛑 ERROR RESPONSE', err.response);
+      saveLog('🛑 ERROR RESPONSE DATA', err.response?.data);
+      saveLog('🛑 ERROR RESPONSE STATUS', err.response?.status);
       
       // Empêcher le rechargement en ajoutant un délai
-      console.log('🛑 Adding delay to prevent page reload...');
+      saveLog('🛑 Adding delay to prevent page reload...');
       await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('🛑 Delay completed - page should still be here');
+      saveLog('🛑 Delay completed - page should still be here');
       
       // Attendre un peu avant de permettre une nouvelle tentative
       setTimeout(() => {
-        console.log('⏰ Error display timeout completed - page should still be here');
+        saveLog('⏰ Error display timeout completed - page should still be here');
       }, 2000);
     } finally {
-      console.log('🏁 Admin login process finished');
+      saveLog('🏁 Admin login process finished');
       setIsLoading(false);
     }
   };
