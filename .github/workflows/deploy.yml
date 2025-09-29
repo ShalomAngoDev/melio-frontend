@@ -20,14 +20,10 @@ jobs:
         node-version: '18'
         
     - name: Install dependencies
-      run: |
-        cd web
-        npm ci
+      run: npm ci
         
     - name: Build
-      run: |
-        cd web
-        npm run build
+      run: npm run build
       env:
         VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://web-production-39a0b.up.railway.app/api/v1' }}
         
@@ -36,4 +32,4 @@ jobs:
       if: github.ref == 'refs/heads/main'
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./web/dist
+        publish_dir: ./dist
