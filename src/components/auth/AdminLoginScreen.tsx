@@ -40,6 +40,13 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       
       if (err.response?.status === 401) {
         errorMessage = 'Email ou mot de passe incorrect';
+      } else if (err.response?.status === 400) {
+        // Erreur 400 peut être une erreur de validation ou d'authentification
+        if (err.response?.data?.message) {
+          errorMessage = err.response.data.message;
+        } else {
+          errorMessage = 'Email ou mot de passe incorrect';
+        }
       } else if (err.response?.status === 500) {
         errorMessage = 'Erreur du serveur. Veuillez réessayer plus tard.';
       } else if (err.message?.includes('Network Error')) {
