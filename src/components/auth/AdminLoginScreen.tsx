@@ -52,9 +52,13 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       setError(errorMessage);
       console.log('❌ Error set:', errorMessage);
       
+      // Logs ralentis pour débogage
+      console.log('🛑 STOPPING HERE - Error displayed, should not reload');
+      console.log('🛑 Current state should be: showAdminLogin=true, user=null');
+      
       // Attendre un peu avant de permettre une nouvelle tentative
       setTimeout(() => {
-        console.log('⏰ Error display timeout completed');
+        console.log('⏰ Error display timeout completed - page should still be here');
       }, 2000);
     } finally {
       console.log('🏁 Admin login process finished');

@@ -33,6 +33,11 @@ function AppContent() {
 
   // Debug logs
   console.log('🔄 AppContent render:', { user, isLoading, isTransitioning, showAdminLogin });
+  
+  // Log spécial pour les rechargements
+  if (showAdminLogin && !user) {
+    console.log('🔍 ADMIN LOGIN PAGE - showAdminLogin=true, user=null');
+  }
 
   useEffect(() => {
     console.log('🔄 useEffect triggered, user:', user);
