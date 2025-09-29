@@ -120,8 +120,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const adminLogin = async (email: string, password: string): Promise<boolean> => {
+    console.log('🔐 Admin login attempt:', email);
     try {
       const response = await authService.adminLogin(email, password);
+      console.log('✅ Admin login response:', response);
       
       if (!response.admin) {
         throw new Error('No admin data in response');
@@ -134,13 +136,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: response.admin.email
       };
 
+      console.log('👤 Setting admin user:', newUser);
       setUser(newUser);
       localStorage.setItem('melio_user', JSON.stringify(newUser));
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken);
+      console.log('✅ Admin login successful');
       return true;
     } catch (error: any) {
-      console.error('Admin login error:', error);
+      console.error('❌ Admin login error:', error);
       // Propager l'erreur pour que le composant puisse l'afficher
       throw error;
     }

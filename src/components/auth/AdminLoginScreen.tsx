@@ -17,19 +17,23 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('📝 Admin form submitted');
+    
     if (!email.trim() || !password.trim()) {
       setError('Veuillez saisir votre email et mot de passe');
       return;
     }
 
+    console.log('🔄 Starting admin login process');
     setIsLoading(true);
     setError('');
 
     try {
       await adminLogin(email.trim(), password);
+      console.log('✅ Admin login successful in component');
       // Si on arrive ici, la connexion a réussi
     } catch (err: any) {
-      console.error('Erreur de connexion admin:', err);
+      console.error('❌ Erreur de connexion admin:', err);
       
       // Gérer différents types d'erreurs
       if (err.response?.status === 401) {
@@ -42,6 +46,7 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
         setError(err.response?.data?.message || 'Erreur de connexion. Veuillez réessayer.');
       }
     } finally {
+      console.log('🏁 Admin login process finished');
       setIsLoading(false);
     }
   };

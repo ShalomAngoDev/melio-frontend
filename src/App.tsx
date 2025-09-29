@@ -27,11 +27,22 @@ function AppContent() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
 
+  // Debug logs
+  console.log('🔄 AppContent render:', { user, isLoading, isTransitioning, showAdminLogin });
+
   useEffect(() => {
+    console.log('🔄 useEffect triggered, user:', user);
     if (user) {
+      console.log('👤 User exists, setting transition');
       setIsTransitioning(true);
-      const timer = setTimeout(() => setIsTransitioning(false), 800);
+      const timer = setTimeout(() => {
+        console.log('⏰ Transition timer completed');
+        setIsTransitioning(false);
+      }, 800);
       return () => clearTimeout(timer);
+    } else {
+      console.log('❌ No user, clearing transition');
+      setIsTransitioning(false);
     }
   }, [user]);
 
