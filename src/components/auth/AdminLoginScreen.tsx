@@ -36,15 +36,26 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       console.error('❌ Erreur de connexion admin:', err);
       
       // Gérer différents types d'erreurs
+      let errorMessage = 'Erreur de connexion. Veuillez réessayer.';
+      
       if (err.response?.status === 401) {
-        setError('Email ou mot de passe incorrect');
+        errorMessage = 'Email ou mot de passe incorrect';
       } else if (err.response?.status === 500) {
-        setError('Erreur du serveur. Veuillez réessayer plus tard.');
+        errorMessage = 'Erreur du serveur. Veuillez réessayer plus tard.';
       } else if (err.message?.includes('Network Error')) {
-        setError('Erreur de connexion. Vérifiez votre connexion internet.');
-      } else {
-        setError(err.response?.data?.message || 'Erreur de connexion. Veuillez réessayer.');
+        errorMessage = 'Erreur de connexion. Vérifiez votre connexion internet.';
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
       }
+      
+      // Afficher l'erreur et empêcher le rechargement
+      setError(errorMessage);
+      console.log('❌ Error set:', errorMessage);
+      
+      // Attendre un peu avant de permettre une nouvelle tentative
+      setTimeout(() => {
+        console.log('⏰ Error display timeout completed');
+      }, 2000);
     } finally {
       console.log('🏁 Admin login process finished');
       setIsLoading(false);

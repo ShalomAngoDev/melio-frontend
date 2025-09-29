@@ -25,7 +25,11 @@ function App() {
 function AppContent() {
   const { user, isLoading } = useAuth();
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [showAdminLogin, setShowAdminLogin] = useState(() => {
+    // Persister l'état showAdminLogin dans sessionStorage
+    const saved = sessionStorage.getItem('showAdminLogin');
+    return saved === 'true';
+  });
 
   // Debug logs
   console.log('🔄 AppContent render:', { user, isLoading, isTransitioning, showAdminLogin });
@@ -46,15 +50,33 @@ function AppContent() {
     }
   }, [user]);
 
+  // Debug: Log when showAdminLogin changes
+  useEffect(() => {
+    console.log('🔄 showAdminLogin changed:', showAdminLogin);
+    // Sauvegarder l'état dans sessionStorage
+    sessionStorage.setItem('showAdminLogin', showAdminLogin.toString());
+  }, [showAdminLogin]);
+
+  // Fonctions pour gérer la navigation
+  const handleShowAdminLogin = () => {
+    console.log('🔄 Showing admin login');
+    setShowAdminLogin(true);
+  };
+
+  const handleBackToLogin = () => {
+    console.log('🔄 Back to regular login');
+    setShowAdminLogin(false);
+  };
+
   if (isLoading || isTransitioning) {
     return <LoadingScreen />;
   }
 
   if (!user) {
     if (showAdminLogin) {
-      return <AdminLoginScreen onBackToLogin={() => setShowAdminLogin(false)} />;
+      return <AdminLoginScreen onBackToLogin={handleBackToLogin} />;
     }
-    return <LoginScreen onShowAdminLogin={() => setShowAdminLogin(true)} />;
+    return <LoginScreen onShowAdminLogin={handleShowAdminLogin} />;
   }
 
   if (user.role === 'admin') {

@@ -26,6 +26,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Debug: Log when user changes
+  useEffect(() => {
+    console.log('👤 User state changed:', user);
+  }, [user]);
+
   useEffect(() => {
     const initializeAuth = async () => {
       const savedUser = localStorage.getItem('melio_user');
