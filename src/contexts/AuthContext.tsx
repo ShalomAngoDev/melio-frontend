@@ -34,22 +34,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (savedUser && savedToken) {
         try {
-          // Vérifier si le token est encore valide
-          const isValid = await validateToken(savedToken);
-          if (isValid) {
-            setUser(JSON.parse(savedUser));
-          } else if (savedRefreshToken) {
-            // Essayer de renouveler le token
-            const refreshed = await refreshAuthToken();
-            if (refreshed) {
-              setUser(JSON.parse(savedUser));
-            } else {
-              // Si le refresh échoue, déconnecter
-              logout();
-            }
-          } else {
-            logout();
-          }
+          // Temporairement désactiver la validation du token pour déboguer
+          console.log('🔄 Loading saved user without token validation');
+          setUser(JSON.parse(savedUser));
+          
+          // TODO: Réactiver la validation du token plus tard
+          // const isValid = await validateToken(savedToken);
+          // if (isValid) {
+          //   setUser(JSON.parse(savedUser));
+          // } else if (savedRefreshToken) {
+          //   const refreshed = await refreshAuthToken();
+          //   if (refreshed) {
+          //     setUser(JSON.parse(savedUser));
+          //   } else {
+          //     logout();
+          //   }
+          // } else {
+          //   logout();
+          // }
         } catch (error) {
           console.error('Erreur lors de la validation du token:', error);
           logout();
@@ -154,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fonction pour valider un token
   const validateToken = async (token: string): Promise<boolean> => {
     try {
-      const response = await fetch('/api/v1/auth/profile', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://web-production-39a0b.up.railway.app/api/v1'}/auth/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
