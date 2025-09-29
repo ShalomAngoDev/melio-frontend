@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, AlertTriangle, BarChart3, FileText, Users, LogOut, Building2, Megaphone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { alertService, reportService } from '../../services/api';
+import { logoIcon, fullLogo } from '../../assets/images';
 import AlertsSection from './AlertsSection';
 import StatisticsSection from './StatisticsSection';
 import ReportsSection from './ReportsSection';
@@ -120,8 +121,8 @@ export default function StaffDashboard() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <div className="flex items-center mr-8">
-                <img src="/logo-icon.png" alt="Melio" className="w-8 h-8 mr-3" />
-                <img src="/fullLogo.png" alt="Melio" className="h-6 w-auto" />
+                <img src={logoIcon} alt="Melio" className="w-8 h-8 mr-3" />
+                <img src={fullLogo} alt="Melio" className="h-6 w-auto" />
               </div>
               <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
                 Espace Agent Social

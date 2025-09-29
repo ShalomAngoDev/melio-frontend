@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { logoIcon, fullLogo } from '../../assets/images';
 
 interface AdminLoginScreenProps {
   onBackToLogin?: () => void;
@@ -42,8 +43,8 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
         {/* Logo et titre */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <img src="/logo-icon.png" alt="Melio" className="w-12 h-12 mr-3" />
-            <img src="/fullLogo.png" alt="Melio" className="h-8 w-auto" />
+            <img src={logoIcon} alt="Melio" className="w-12 h-12 mr-3" />
+            <img src={fullLogo} alt="Melio" className="h-8 w-auto" />
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Administration Melio</h1>
           <p className="text-gray-600">Accès sécurisé au tableau de bord global</p>

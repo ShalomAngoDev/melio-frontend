@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { School, Users, Shield, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { logoIcon, fullLogo } from '../../assets/images';
 import { useToast } from '../../contexts/ToastContext';
 
 interface LoginScreenProps {
@@ -58,7 +59,7 @@ export default function LoginScreen({ onShowAdminLogin }: LoginScreenProps) {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="mb-3 flex justify-center">
-            <img src="/fullLogo.png" alt="Melio" className="h-10 w-auto" />
+            <img src={fullLogo} alt="Melio" className="h-10 w-auto" />
           </div>
           <p className="text-gray-600 text-lg">Interface de gestion pour les écoles</p>
           <div className="flex items-center justify-center mt-4 space-x-4 text-sm text-gray-500">
@@ -67,7 +68,7 @@ export default function LoginScreen({ onShowAdminLogin }: LoginScreenProps) {
               <span>Sécurisé</span>
             </div>
             <div className="flex items-center">
-              <img src="/logo-icon.png" alt="Melio" className="w-4 h-4 mr-1" />
+              <img src={logoIcon} alt="Melio" className="w-4 h-4 mr-1" />
               <span>Confidentiel</span>
             </div>
           </div>

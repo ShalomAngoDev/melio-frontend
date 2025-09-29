@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { adminService } from '../../services/api';
+import { logoIcon, fullLogo } from '../../assets/images';
 import SchoolsOverview from './SchoolsOverview';
 import SchoolManagement from './SchoolManagement';
 import GlobalStatisticsSection from './GlobalStatisticsSection';
@@ -76,8 +77,8 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <div className="flex items-center mr-8">
-                <img src="/logo-icon.png" alt="Melio" className="w-8 h-8 mr-3" />
-                <img src="/fullLogo.png" alt="Melio" className="h-6 w-auto" />
+                <img src={logoIcon} alt="Melio" className="w-8 h-8 mr-3" />
+                <img src={fullLogo} alt="Melio" className="h-6 w-auto" />
               </div>
               <div className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
                 Administration Melio
