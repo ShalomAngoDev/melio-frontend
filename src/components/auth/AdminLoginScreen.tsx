@@ -54,6 +54,10 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       // Afficher l'erreur et arrêter le chargement
       setError(errorMessage);
       setIsLoading(false);
+      
+      // Empêcher le rechargement en empêchant la propagation
+      e.stopPropagation();
+      e.preventDefault();
     }
   };
 

@@ -26,55 +26,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Debug: Log when user changes
-  useEffect(() => {
-    console.log('👤 User state changed:', user);
-    if (user === null) {
-      console.log('🔄 User set to null - this might cause page reload');
-    }
-  }, [user]);
 
   useEffect(() => {
     const initializeAuth = async () => {
-      console.log('🔄 Initializing auth...');
       const savedUser = localStorage.getItem('melio_user');
       const savedToken = localStorage.getItem('accessToken');
       const savedRefreshToken = localStorage.getItem('refreshToken');
 
-      console.log('📦 Saved data:', { 
-        hasUser: !!savedUser, 
-        hasToken: !!savedToken, 
-        hasRefreshToken: !!savedRefreshToken 
-      });
-
       if (savedUser && savedToken) {
         try {
           // Temporairement désactiver la validation du token pour déboguer
-          console.log('🔄 Loading saved user without token validation');
           setUser(JSON.parse(savedUser));
-          
-          // TODO: Réactiver la validation du token plus tard
-          // const isValid = await validateToken(savedToken);
-          // if (isValid) {
-          //   setUser(JSON.parse(savedUser));
-          // } else if (savedRefreshToken) {
-          //   const refreshed = await refreshAuthToken();
-          //   if (refreshed) {
-          //     setUser(JSON.parse(savedUser));
-          //   } else {
-          //     logout();
-          //   }
-          // } else {
-          //   logout();
-          // }
         } catch (error) {
           console.error('Erreur lors de la validation du token:', error);
           logout();
         }
-      } else {
-        console.log('❌ No saved user or token');
       }
-      console.log('✅ Auth initialization complete');
       setIsLoading(false);
     };
 
@@ -138,10 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const adminLogin = async (email: string, password: string): Promise<boolean> => {
-    console.log('🔐 Admin login attempt:', email);
     try {
       const response = await authService.adminLogin(email, password);
-      console.log('✅ Admin login response:', response);
       
       if (!response.admin) {
         throw new Error('No admin data in response');
@@ -154,23 +119,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: response.admin.email
       };
 
-      console.log('👤 Setting admin user:', newUser);
       setUser(newUser);
       localStorage.setItem('melio_user', JSON.stringify(newUser));
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken);
-      console.log('✅ Admin login successful');
       return true;
     } catch (error: any) {
-      console.error('❌ Admin login error:', error);
-      console.log('🔄 Admin login failed - user should remain null');
-      
-      // Sauvegarder l'erreur dans localStorage aussi
-      const timestamp = new Date().toISOString();
-      const logEntry = `[${timestamp}] 🔄 Admin login failed - user should remain null`;
-      const existingLogs = localStorage.getItem('debug_logs') || '';
-      localStorage.setItem('debug_logs', existingLogs + '\n' + logEntry);
-      
       // Propager l'erreur pour que le composant puisse l'afficher
       throw error;
     }
