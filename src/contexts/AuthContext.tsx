@@ -29,13 +29,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Debug: Log when user changes
   useEffect(() => {
     console.log('👤 User state changed:', user);
+    if (user === null) {
+      console.log('🔄 User set to null - this might cause page reload');
+    }
   }, [user]);
 
   useEffect(() => {
     const initializeAuth = async () => {
+      console.log('🔄 Initializing auth...');
       const savedUser = localStorage.getItem('melio_user');
       const savedToken = localStorage.getItem('accessToken');
       const savedRefreshToken = localStorage.getItem('refreshToken');
+
+      console.log('📦 Saved data:', { 
+        hasUser: !!savedUser, 
+        hasToken: !!savedToken, 
+        hasRefreshToken: !!savedRefreshToken 
+      });
 
       if (savedUser && savedToken) {
         try {
@@ -61,7 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.error('Erreur lors de la validation du token:', error);
           logout();
         }
+      } else {
+        console.log('❌ No saved user or token');
       }
+      console.log('✅ Auth initialization complete');
       setIsLoading(false);
     };
 
@@ -150,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (error: any) {
       console.error('❌ Admin login error:', error);
+      console.log('🔄 Admin login failed - user should remain null');
       // Propager l'erreur pour que le composant puisse l'afficher
       throw error;
     }
