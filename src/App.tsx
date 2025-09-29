@@ -31,55 +31,30 @@ function AppContent() {
     return saved === 'true';
   });
 
-  // Debug logs
-  console.log('🔄 AppContent render:', { user, isLoading, isTransitioning, showAdminLogin });
-  
-  // Log spécial pour les rechargements
-  if (showAdminLogin && !user) {
-    console.log('🔍 ADMIN LOGIN PAGE - showAdminLogin=true, user=null');
-  }
-  
-  // Log spécial pour détecter les rechargements
-  if (showAdminLogin && !user && !isLoading) {
-    console.log('🚨 ADMIN PAGE ACTIVE - This should not reload');
-  }
-  
-  // Log spécial pour les changements d'état
-  if (showAdminLogin && !user && isLoading) {
-    console.log('⏳ ADMIN PAGE LOADING - isLoading=true');
-  }
 
   useEffect(() => {
-    console.log('🔄 useEffect triggered, user:', user);
     if (user) {
-      console.log('👤 User exists, setting transition');
       setIsTransitioning(true);
       const timer = setTimeout(() => {
-        console.log('⏰ Transition timer completed');
         setIsTransitioning(false);
       }, 800);
       return () => clearTimeout(timer);
     } else {
-      console.log('❌ No user, clearing transition');
       setIsTransitioning(false);
     }
   }, [user]);
 
-  // Debug: Log when showAdminLogin changes
+  // Sauvegarder l'état dans sessionStorage
   useEffect(() => {
-    console.log('🔄 showAdminLogin changed:', showAdminLogin);
-    // Sauvegarder l'état dans sessionStorage
     sessionStorage.setItem('showAdminLogin', showAdminLogin.toString());
   }, [showAdminLogin]);
 
   // Fonctions pour gérer la navigation
   const handleShowAdminLogin = () => {
-    console.log('🔄 Showing admin login');
     setShowAdminLogin(true);
   };
 
   const handleBackToLogin = () => {
-    console.log('🔄 Back to regular login');
     setShowAdminLogin(false);
   };
 

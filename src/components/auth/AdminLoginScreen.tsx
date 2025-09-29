@@ -16,38 +16,21 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
   const [error, setError] = useState('');
   const [showLogs, setShowLogs] = useState(false);
 
-  // Fonction pour sauvegarder les logs
-  const saveLog = (message: string, data?: any) => {
-    const timestamp = new Date().toISOString();
-    const logEntry = `[${timestamp}] ${message}${data ? ' - ' + JSON.stringify(data) : ''}`;
-    console.log(logEntry);
-    
-    // Sauvegarder dans localStorage
-    const existingLogs = localStorage.getItem('debug_logs') || '';
-    const newLogs = existingLogs + '\n' + logEntry;
-    localStorage.setItem('debug_logs', newLogs);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveLog('📝 Admin form submitted');
     
     if (!email.trim() || !password.trim()) {
       setError('Veuillez saisir votre email et mot de passe');
       return;
     }
 
-    saveLog('🔄 Starting admin login process');
     setIsLoading(true);
     setError('');
 
     try {
       await adminLogin(email.trim(), password);
-      saveLog('✅ Admin login successful in component');
       // Si on arrive ici, la connexion a réussi
     } catch (err: any) {
-      saveLog('❌ Erreur de connexion admin', err);
-      
       // Gérer différents types d'erreurs
       let errorMessage = 'Erreur de connexion. Veuillez réessayer.';
       
@@ -68,36 +51,9 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
         errorMessage = err.response.data.message;
       }
       
-      // Afficher l'erreur et empêcher le rechargement
+      // Afficher l'erreur et arrêter le chargement
       setError(errorMessage);
-      saveLog('❌ Error set', errorMessage);
-      
-      // Logs ralentis pour débogage
-      saveLog('🛑 STOPPING HERE - Error displayed, should not reload');
-      saveLog('🛑 Current state should be: showAdminLogin=true, user=null');
-      saveLog('🛑 ERROR MESSAGE', errorMessage);
-      saveLog('🛑 ERROR OBJECT', err);
-      saveLog('🛑 ERROR RESPONSE', err.response);
-      saveLog('🛑 ERROR RESPONSE DATA', err.response?.data);
-      saveLog('🛑 ERROR RESPONSE STATUS', err.response?.status);
-      
-      // Empêcher le rechargement en ajoutant un délai
-      saveLog('🛑 Adding delay to prevent page reload...');
-      
-      // Utiliser setTimeout au lieu de await Promise
-      setTimeout(() => {
-        saveLog('🛑 Delay completed - page should still be here');
-      }, 1000);
-      
-      // Attendre un peu avant de permettre une nouvelle tentative
-      setTimeout(() => {
-        saveLog('⏰ Error display timeout completed - page should still be here');
-      }, 2000);
-    } finally {
-      saveLog('🏁 Admin login process finished');
-      saveLog('🔄 About to set isLoading to false');
       setIsLoading(false);
-      saveLog('✅ isLoading set to false');
     }
   };
 
