@@ -62,6 +62,13 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       // Logs ralentis pour débogage
       console.log('🛑 STOPPING HERE - Error displayed, should not reload');
       console.log('🛑 Current state should be: showAdminLogin=true, user=null');
+      console.log('🛑 ERROR MESSAGE:', errorMessage);
+      console.log('🛑 ERROR OBJECT:', err);
+      
+      // Empêcher le rechargement en ajoutant un délai
+      console.log('🛑 Adding delay to prevent page reload...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('🛑 Delay completed - page should still be here');
       
       // Attendre un peu avant de permettre une nouvelle tentative
       setTimeout(() => {

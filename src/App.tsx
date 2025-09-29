@@ -38,6 +38,11 @@ function AppContent() {
   if (showAdminLogin && !user) {
     console.log('🔍 ADMIN LOGIN PAGE - showAdminLogin=true, user=null');
   }
+  
+  // Log spécial pour détecter les rechargements
+  if (showAdminLogin && !user && !isLoading) {
+    console.log('🚨 ADMIN PAGE ACTIVE - This should not reload');
+  }
 
   useEffect(() => {
     console.log('🔄 useEffect triggered, user:', user);
