@@ -164,6 +164,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error: any) {
       console.error('❌ Admin login error:', error);
       console.log('🔄 Admin login failed - user should remain null');
+      
+      // Sauvegarder l'erreur dans localStorage aussi
+      const timestamp = new Date().toISOString();
+      const logEntry = `[${timestamp}] 🔄 Admin login failed - user should remain null`;
+      const existingLogs = localStorage.getItem('debug_logs') || '';
+      localStorage.setItem('debug_logs', existingLogs + '\n' + logEntry);
+      
       // Propager l'erreur pour que le composant puisse l'afficher
       throw error;
     }

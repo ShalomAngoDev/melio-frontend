@@ -83,8 +83,11 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       
       // Empêcher le rechargement en ajoutant un délai
       saveLog('🛑 Adding delay to prevent page reload...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      saveLog('🛑 Delay completed - page should still be here');
+      
+      // Utiliser setTimeout au lieu de await Promise
+      setTimeout(() => {
+        saveLog('🛑 Delay completed - page should still be here');
+      }, 1000);
       
       // Attendre un peu avant de permettre une nouvelle tentative
       setTimeout(() => {
