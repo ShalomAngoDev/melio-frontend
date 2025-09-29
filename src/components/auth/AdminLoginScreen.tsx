@@ -64,6 +64,9 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       console.log('🛑 Current state should be: showAdminLogin=true, user=null');
       console.log('🛑 ERROR MESSAGE:', errorMessage);
       console.log('🛑 ERROR OBJECT:', err);
+      console.log('🛑 ERROR RESPONSE:', err.response);
+      console.log('🛑 ERROR RESPONSE DATA:', err.response?.data);
+      console.log('🛑 ERROR RESPONSE STATUS:', err.response?.status);
       
       // Empêcher le rechargement en ajoutant un délai
       console.log('🛑 Adding delay to prevent page reload...');
