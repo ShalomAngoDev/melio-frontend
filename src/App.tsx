@@ -43,6 +43,11 @@ function AppContent() {
   if (showAdminLogin && !user && !isLoading) {
     console.log('🚨 ADMIN PAGE ACTIVE - This should not reload');
   }
+  
+  // Log spécial pour les changements d'état
+  if (showAdminLogin && !user && isLoading) {
+    console.log('⏳ ADMIN PAGE LOADING - isLoading=true');
+  }
 
   useEffect(() => {
     console.log('🔄 useEffect triggered, user:', user);

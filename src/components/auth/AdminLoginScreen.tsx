@@ -95,7 +95,9 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       }, 2000);
     } finally {
       saveLog('🏁 Admin login process finished');
+      saveLog('🔄 About to set isLoading to false');
       setIsLoading(false);
+      saveLog('✅ isLoading set to false');
     }
   };
 
