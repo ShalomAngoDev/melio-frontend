@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { logoIcon, fullLogo } from '../../assets/images';
+import { handleAuthError } from '../../utils/auth-error-handler';
 
 interface AdminLoginScreenProps {
   onBackToLogin?: () => void;
@@ -36,28 +37,7 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       await adminLogin(email.trim(), password);
       // Si on arrive ici, la connexion a réussi
     } catch (err: any) {
-      // Gérer différents types d'erreurs
-      let errorMessage = 'Erreur de connexion. Veuillez réessayer.';
-      
-      if (err.response?.status === 401) {
-        errorMessage = 'Email ou mot de passe incorrect';
-      } else if (err.response?.status === 400) {
-        // Erreur 400 peut être une erreur de validation ou d'authentification
-        if (err.response?.data?.message) {
-          errorMessage = err.response.data.message;
-        } else {
-          errorMessage = 'Email ou mot de passe incorrect';
-        }
-      } else if (err.response?.status === 500) {
-        errorMessage = 'Erreur du serveur. Veuillez réessayer plus tard.';
-      } else if (err.message?.includes('Network Error')) {
-        errorMessage = 'Erreur de connexion. Vérifiez votre connexion internet.';
-      } else if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      }
-      
-      // Afficher l'erreur et arrêter le chargement
-      setError(errorMessage);
+      handleAuthError(err, setError);
       setIsLoading(false);
     }
   };

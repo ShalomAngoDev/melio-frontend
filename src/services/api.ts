@@ -26,8 +26,12 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Ne pas essayer de refresh pour les requêtes de login ou de refresh
+    const isLoginRequest = originalRequest.url?.includes('/auth/') && 
+                          (originalRequest.url?.includes('/login') || originalRequest.url?.includes('/refresh'));
+    
     // Éviter la boucle infinie : ne pas essayer de refresh pour les requêtes de refresh
-    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/refresh')) {
+    if (error.response?.status === 401 && !originalRequest._retry && !isLoginRequest) {
       originalRequest._retry = true;
 
       try {
@@ -56,7 +60,14 @@ api.interceptors.response.use(
       localStorage.removeItem('melio_user');
       
       // Éviter le rechargement de page pour les erreurs 401 sur la page de login
-      if (!window.location.pathname.includes('/login')) {
+      // Vérifier aussi si on est sur la racine ou une page d'auth
+      const currentPath = window.location.pathname;
+      const isOnAuthPage = currentPath === '/' || 
+                          currentPath.includes('/login') || 
+                          currentPath.includes('/auth');
+      
+      if (!isOnAuthPage) {
+        // Seulement rediriger si on n'est pas déjà sur une page d'auth
         window.location.href = '/';
       }
     }

@@ -3,6 +3,7 @@ import { School, Users, Shield, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { logoIcon, fullLogo } from '../../assets/images';
 import { useToast } from '../../contexts/ToastContext';
+import { handleAuthError } from '../../utils/auth-error-handler';
 
 interface LoginScreenProps {
   onShowAdminLogin?: () => void;
@@ -35,23 +36,7 @@ export default function LoginScreen({ onShowAdminLogin }: LoginScreenProps) {
       // Si on arrive ici, la connexion a réussi
       showSuccess('Connexion réussie !');
     } catch (err: any) {
-      console.error('Erreur de connexion agent:', err);
-      
-      // Gérer différents types d'erreurs
-      let errorMsg = 'Erreur de connexion. Veuillez réessayer.';
-      
-      if (err.response?.status === 401) {
-        errorMsg = 'Code école, email ou mot de passe incorrect';
-      } else if (err.response?.status === 500) {
-        errorMsg = 'Erreur du serveur. Veuillez réessayer plus tard.';
-      } else if (err.message?.includes('Network Error')) {
-        errorMsg = 'Erreur de connexion. Vérifiez votre connexion internet.';
-      } else if (err.response?.data?.message) {
-        errorMsg = err.response.data.message;
-      }
-      
-      setError(errorMsg);
-      showError(errorMsg);
+      handleAuthError(err, setError, showError);
     } finally {
       setIsLoading(false);
     }
@@ -67,11 +52,27 @@ export default function LoginScreen({ onShowAdminLogin }: LoginScreenProps) {
     }
   ];
 
-  const quickLogin = (school: string, email: string, password: string) => {
+  const quickLogin = async (school: string, email: string, password: string) => {
     setSchoolCode(school);
     setEmail(email);
     setPassword(password);
-    agentLogin(school, email, password);
+    
+    // Utiliser la même logique que handleSubmit pour éviter les problèmes
+    if (isLoading) {
+      return;
+    }
+    
+    setIsLoading(true);
+    setError('');
+
+    try {
+      await agentLogin(school, email, password);
+      showSuccess('Connexion réussie !');
+    } catch (err: any) {
+      handleAuthError(err, setError, showError);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

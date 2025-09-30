@@ -37,7 +37,7 @@ function AppContent() {
       setIsTransitioning(true);
       const timer = setTimeout(() => {
         setIsTransitioning(false);
-      }, 800);
+      }, 300); // Réduire le temps de transition
       return () => clearTimeout(timer);
     } else {
       setIsTransitioning(false);
