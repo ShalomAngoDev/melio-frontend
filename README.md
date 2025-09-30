@@ -1,36 +1,61 @@
-# Melio Web - Interface de gestion pour les écoles
+# 🌐 Melio Web
 
-Version web de Melio destinée aux agents sociaux et administrateurs d'école.
-
-## 🎯 Fonctionnalités
-
-- **Tableau de bord des agents sociaux** avec statistiques
-- **Gestion des alertes** et signalements
-- **Suivi des rapports** des élèves
-- **Statistiques** sur l'utilisation de l'application
-- **Interface web complète** pour la gestion administrative
+Interface web pour les agents sociaux et administrateurs d'école.
 
 ## 🚀 Démarrage rapide
 
 ```bash
-# Installation des dépendances
+# Installation
 npm install
 
-# Démarrage du serveur de développement
-npm run dev
+# Configuration
+cp env.example .env
+# Définissez VITE_API_BASE_URL=http://localhost:3000/api/v1
 
-# Build pour la production
-npm run build
+# Démarrage
+npm run dev
 ```
 
-## 🌐 Accès
+**🌐 Interface :** `http://localhost:5173`
 
-- **URL de développement** : http://localhost:5173
-- **Connexion agent social** :
-  - Code école : `COLLEGE2024`
-  - Identifiant agent : `AGENT001`
+## 🎯 Fonctionnalités
 
-## 📱 Différence avec la version mobile
+- **Tableau de bord** avec statistiques en temps réel
+- **Gestion des alertes** générées par l'IA
+- **Suivi des signalements** et rapports
+- **Commentaires et historique** des interventions
+- **Export de données** et rapports
 
-- **Version web** : Destinée aux agents sociaux et administrateurs
-- **Version mobile** : Réservée aux élèves uniquement
+## 🔑 Comptes de test
+
+### Agents sociaux
+```
+Code école: JMO75-01
+Email: agent@college-victor-hugo.fr
+Mot de passe: agent123
+```
+
+### Administrateurs
+```
+Email: admin@melio.app
+Mot de passe: admin123
+```
+
+## 🛠️ Développement
+
+```bash
+npm run build           # Build de production
+npm run preview         # Prévisualisation du build
+npm run lint            # Vérification du code
+```
+
+## 📦 Technologies
+
+- **React** + **TypeScript**
+- **Vite** - Build tool
+- **Tailwind CSS** - Styling
+- **Axios** - Client HTTP
+
+---
+
+Pour plus d'informations, consultez le [README principal](../README.md).
