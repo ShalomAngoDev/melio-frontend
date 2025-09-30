@@ -3,13 +3,20 @@
  * Évite les rechargements de page lors des erreurs 401
  */
 
-export const handleAuthError = (error: any, setError: (error: string) => void, showError?: (error: string) => void) => {
+export const handleAuthError = (
+  error: any, 
+  setError: (error: string) => void, 
+  showError?: (error: string) => void,
+  isAdminLogin: boolean = false
+) => {
   console.error('Erreur d\'authentification:', error);
   
   let errorMsg = 'Erreur de connexion. Veuillez réessayer.';
   
   if (error.response?.status === 401) {
-    errorMsg = 'Code école, email ou mot de passe incorrect';
+    errorMsg = isAdminLogin 
+      ? 'Email ou mot de passe incorrect'
+      : 'Code école, email ou mot de passe incorrect';
   } else if (error.response?.status === 500) {
     errorMsg = 'Erreur du serveur. Veuillez réessayer plus tard.';
   } else if (error.message?.includes('Network Error')) {

@@ -37,7 +37,7 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       await adminLogin(email.trim(), password);
       // Si on arrive ici, la connexion a réussi
     } catch (err: any) {
-      handleAuthError(err, setError);
+      handleAuthError(err, setError, undefined, true); // true pour admin login
       setIsLoading(false);
     }
   };
