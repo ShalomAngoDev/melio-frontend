@@ -8,6 +8,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Pour supporter les cookies de session
 });
 
 // Intercepteur pour ajouter le token d'authentification
@@ -53,7 +54,11 @@ api.interceptors.response.use(
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('melio_user');
-      window.location.href = '/';
+      
+      // Éviter le rechargement de page pour les erreurs 401 sur la page de login
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/';
+      }
     }
     
     return Promise.reject(error);
@@ -152,6 +157,8 @@ export const authService = {
       schoolCode,
       email,
       password,
+    }, {
+      withCredentials: true, // S'assurer que les cookies sont envoyés
     });
     return response.data;
   },
@@ -161,6 +168,8 @@ export const authService = {
     const response = await api.post('/auth/admin/login', {
       email,
       password,
+    }, {
+      withCredentials: true, // S'assurer que les cookies sont envoyés
     });
     return response.data;
   },

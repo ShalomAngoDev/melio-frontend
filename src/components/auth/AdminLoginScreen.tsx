@@ -19,6 +19,11 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Éviter les soumissions multiples
+    if (isLoading) {
+      return;
+    }
+    
     if (!email.trim() || !password.trim()) {
       setError('Veuillez saisir votre email et mot de passe');
       return;
@@ -54,10 +59,6 @@ export default function AdminLoginScreen({ onBackToLogin }: AdminLoginScreenProp
       // Afficher l'erreur et arrêter le chargement
       setError(errorMessage);
       setIsLoading(false);
-      
-      // Empêcher le rechargement en empêchant la propagation
-      e.stopPropagation();
-      e.preventDefault();
     }
   };
 

@@ -21,6 +21,12 @@ export default function LoginScreen({ onShowAdminLogin }: LoginScreenProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Éviter les soumissions multiples
+    if (isLoading) {
+      return;
+    }
+    
     setIsLoading(true);
     setError('');
 
