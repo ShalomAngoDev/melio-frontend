@@ -26,11 +26,11 @@ function AppContent() {
   const { user, isLoading } = useAuth();
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(() => {
-    // Persister l'état showAdminLogin dans sessionStorage
+    // Vérifier si l'URL contient un paramètre admin ou si c'est dans sessionStorage
+    const urlParams = new URLSearchParams(window.location.search);
     const saved = sessionStorage.getItem('showAdminLogin');
-    return saved === 'true';
+    return urlParams.get('admin') === 'true' || saved === 'true';
   });
-
 
   useEffect(() => {
     if (user) {
@@ -44,7 +44,6 @@ function AppContent() {
     }
   }, [user]);
 
-  // Sauvegarder l'état dans sessionStorage
   useEffect(() => {
     sessionStorage.setItem('showAdminLogin', showAdminLogin.toString());
   }, [showAdminLogin]);

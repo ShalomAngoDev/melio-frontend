@@ -9,3 +9,13 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Animation de balayage lumineux */
+@keyframes light-sweep {
+  0% {
+    transform: translateX(-100%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(100%) skewX(-12deg);
+  }
+}

@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
   AlertTriangle, 
-  Eye, 
-  EyeOff, 
   Filter, 
   RefreshCw,
   Calendar,
@@ -26,7 +24,6 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('NOUVELLE');
-  const [expandedAlert, setExpandedAlert] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(() => {
     const saved = localStorage.getItem('alerts-showFilters');
     return saved !== null ? JSON.parse(saved) : true;
@@ -39,9 +36,8 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
   const [comment, setComment] = useState('');
   const [alertComments, setAlertComments] = useState<any[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
-  const [editCommentText, setEditCommentText] = useState('');
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -127,6 +123,38 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
     }
   };
 
+  const refreshAlerts = async () => {
+    console.log('Refreshing alerts...');
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Vider le cache local
+      setAllAlerts([]);
+      setFilteredAlerts([]);
+      setAlerts([]);
+      
+      // Nettoyer le localStorage des données d'alertes obsolètes
+      localStorage.removeItem('alerts-showFilters');
+      
+      // Recharger les alertes
+      await loadAlerts(false);
+      
+      // Fermer les détails d'alerte ouverts
+      setAlertComments([]);
+      setShowDetailModal(false);
+      
+      showSuccess('Alertes actualisées avec succès');
+    } catch (err: any) {
+      console.error('Failed to refresh alerts:', err);
+      setError(err.response?.data?.message || err.message || 'Erreur lors de l\'actualisation des alertes');
+      showError('Erreur lors de l\'actualisation des alertes');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
   const loadStats = async () => {
     try {
       const data = await alertService.getAlertStats();
@@ -139,6 +167,14 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
 
 
   const handleStatusChange = (alertId: string, status: 'NOUVELLE' | 'EN_COURS' | 'TRAITEE') => {
+    // Vérifier que l'alerte existe encore
+    const alertExists = allAlerts.find(alert => alert.id === alertId);
+    if (!alertExists) {
+      console.warn(`Alert ${alertId} no longer exists`);
+      showWarning('Cette alerte n\'existe plus. Veuillez actualiser la page.');
+      return;
+    }
+    
     setSelectedAlertId(alertId);
     setNewStatus(status);
     setComment('');
@@ -190,55 +226,48 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
   const loadAlertComments = async (alertId: string) => {
     setLoadingComments(true);
     try {
+      // Vérifier d'abord si l'alerte existe encore
+      const alertExists = allAlerts.find(alert => alert.id === alertId);
+      if (!alertExists) {
+        console.warn(`Alert ${alertId} no longer exists, refreshing alerts...`);
+        await loadAlerts(false); // Recharger les alertes
+        setError('Cette alerte n\'existe plus. Les données ont été actualisées.');
+        showWarning('Cette alerte n\'existe plus. Les données ont été actualisées.');
+        return;
+      }
+
       const comments = await alertService.getAlertComments(alertId);
       setAlertComments(comments);
     } catch (err: any) {
       console.error('Failed to load comments:', err);
-      setError(err.response?.data?.message || 'Erreur lors du chargement des commentaires');
+      
+      // Si l'erreur est 404 ou 500, l'alerte n'existe probablement plus
+      if (err.response?.status === 404 || err.response?.status === 500) {
+        console.warn(`Alert ${alertId} not found, refreshing alerts...`);
+        await loadAlerts(false); // Recharger les alertes
+        setError('Cette alerte n\'existe plus. Les données ont été actualisées.');
+        showWarning('Cette alerte n\'existe plus. Les données ont été actualisées.');
+      } else {
+        setError(err.response?.data?.message || 'Erreur lors du chargement des commentaires');
+        showError(err.response?.data?.message || 'Erreur lors du chargement des commentaires');
+      }
     } finally {
       setLoadingComments(false);
     }
   };
 
-  const handleEditComment = (commentId: string, currentText: string) => {
-    setSelectedCommentId(commentId);
-    setEditCommentText(currentText);
-    setShowEditModal(true);
+
+  const handleOpenDetailModal = async (alert: Alert) => {
+    setSelectedAlert(alert);
+    setShowDetailModal(true);
+    // Charger les commentaires pour cette alerte
+    await loadAlertComments(alert.id);
   };
 
-  const submitEditComment = async () => {
-    if (!selectedCommentId || !editCommentText.trim()) {
-      setError('Le commentaire ne peut pas être vide');
-      showWarning('Le commentaire ne peut pas être vide');
-      return;
-    }
-
-    try {
-      // Note: Cette fonctionnalité nécessiterait un endpoint backend pour modifier les commentaires
-      // Pour l'instant, on simule la mise à jour côté client
-      setAlertComments(prev => prev.map(comment => 
-        comment.id === selectedCommentId 
-          ? { ...comment, comment: editCommentText }
-          : comment
-      ));
-      
-      setShowEditModal(false);
-      setSelectedCommentId(null);
-      setEditCommentText('');
-      showSuccess('Commentaire modifié avec succès');
-    } catch (err: any) {
-      console.error('Failed to edit comment:', err);
-      const errorMessage = err.response?.data?.message || 'Erreur lors de la modification du commentaire';
-      setError(errorMessage);
-      showError(errorMessage);
-    }
-  };
-
-  const handleQuickStatusChange = async (alertId: string, newStatus: 'NOUVELLE' | 'EN_COURS' | 'TRAITEE') => {
-    setSelectedAlertId(alertId);
-    setNewStatus(newStatus);
-    setComment('');
-    setShowCommentModal(true);
+  const handleCloseDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedAlert(null);
+    setAlertComments([]);
   };
 
   const getRiskLevelColor = (level: string) => {
@@ -348,9 +377,9 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
           </div>
           <div className="flex items-center space-x-3">
             <button
-              onClick={loadAlerts}
+              onClick={refreshAlerts}
               className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
-              title="Actualiser"
+              title="Actualiser les alertes"
             >
               <RefreshCw className="w-5 h-5" />
             </button>
@@ -441,7 +470,8 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
             return (
               <div
                 key={alert.id}
-                className={`${colors.card} backdrop-blur-sm rounded-xl shadow-lg border border-white/20 overflow-hidden hover:shadow-xl transition-all duration-200`}
+                onClick={() => handleOpenDetailModal(alert)}
+                className={`${colors.card} backdrop-blur-sm rounded-xl shadow-lg border border-white/20 overflow-hidden hover:shadow-xl transition-all duration-200 cursor-pointer`}
               >
               {/* Header compact */}
               <div className={`p-3 ${colors.header}`}>
@@ -485,32 +515,12 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
                       </div>
 
                   <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => {
-                        const newExpandedAlert = expandedAlert === alert.id ? null : alert.id;
-                        setExpandedAlert(newExpandedAlert);
-                        if (newExpandedAlert) {
-                          loadAlertComments(alert.id);
-                        }
-                      }}
-                      className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 transition-colors duration-200 flex items-center"
-                    >
-                      {expandedAlert === alert.id ? (
-                        <>
-                          <EyeOff className="w-3 h-3 mr-1" />
-                          Masquer
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="w-3 h-3 mr-1" />
-                          Détails
-                        </>
-                      )}
-                    </button>
-                    
                     {alert.status === 'NOUVELLE' && (
                       <button
-                        onClick={() => handleStatusChange(alert.id, 'EN_COURS')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStatusChange(alert.id, 'EN_COURS');
+                        }}
                         className={`px-3 py-1 ${colors.button} rounded-lg transition-all duration-200 text-xs font-medium`}
                       >
                         Prendre en charge
@@ -519,7 +529,10 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
                     
                     {alert.status === 'EN_COURS' && (
                         <button
-                        onClick={() => handleStatusChange(alert.id, 'TRAITEE')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStatusChange(alert.id, 'TRAITEE');
+                        }}
                         className={`px-3 py-1 ${colors.button} rounded-lg transition-all duration-200 text-xs font-medium`}
                         >
                         Marquer comme traitée
@@ -529,124 +542,6 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
                 </div>
               </div>
 
-              {/* Détails étendus - Format compact */}
-              {expandedAlert === alert.id && (
-                <div className="border-t border-gray-200 bg-gray-50/50 p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-700 mb-2">Informations élève</h4>
-                      <div className="space-y-1 text-xs text-gray-600">
-                        <p><span className="font-medium">Nom :</span> {alert.student.firstName} {alert.student.lastName}</p>
-                        <p><span className="font-medium">Classe :</span> {alert.student.className}</p>
-                        <p><span className="font-medium">Humeur :</span> {alert.childMood}</p>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-700 mb-2">Détails technique</h4>
-                      <div className="space-y-1 text-xs text-gray-600">
-                        <p><span className="font-medium">Source :</span> {alert.sourceType}</p>
-                        <p><span className="font-medium">ID Source :</span> {alert.sourceId}</p>
-                        <p><span className="font-medium">Score :</span> {alert.riskScore}/100</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Recommandation détaillée */}
-                  <div className="mt-3 bg-green-50 rounded-xl p-3 border border-green-200">
-                    <h4 className="text-xs font-semibold text-green-800 mb-1 flex items-center">
-                      <Shield className="w-3 h-3 mr-1" />
-                      Recommandation
-                    </h4>
-                    <p className="text-green-700 text-xs leading-relaxed">{alert.aiAdvice}</p>
-                  </div>
-
-                  {/* Historique des commentaires */}
-                  <div className="mt-3 bg-gray-50 rounded-xl p-3 border border-gray-200">
-                    <h4 className="text-xs font-semibold text-gray-800 mb-2 flex items-center">
-                      <Calendar className="w-3 h-3 mr-1" />
-                      Historique du suivi
-                    </h4>
-                    
-                    {loadingComments ? (
-                      <div className="flex items-center justify-center py-2">
-                        <RefreshCw className="w-4 h-4 text-gray-400 animate-spin mr-2" />
-                        <span className="text-xs text-gray-500">Chargement de l'historique...</span>
-                      </div>
-                    ) : alertComments.length === 0 ? (
-                      <div className="text-center py-2">
-                        <p className="text-xs text-gray-500">Aucun commentaire pour le moment</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-40 overflow-y-auto">
-                        {alertComments.map((comment) => (
-                          <div key={comment.id} className="bg-white rounded-lg p-2 border border-gray-200">
-                            <div className="flex items-center justify-between mb-1">
-                              <div className="flex items-center space-x-2">
-                                <span className="text-xs font-medium text-gray-700">
-                                  {comment.agentName}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {new Date(comment.createdAt).toLocaleString('fr-FR', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                {comment.oldStatus && (
-                                  <span className="text-xs text-gray-500">{comment.oldStatus}</span>
-                                )}
-                                {comment.oldStatus && (
-                                  <span className="text-xs text-gray-400">→</span>
-                                )}
-                                <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                  comment.newStatus === 'NOUVELLE' ? 'bg-blue-100 text-blue-700' :
-                                  comment.newStatus === 'EN_COURS' ? 'bg-orange-100 text-orange-700' :
-                                  'bg-green-100 text-green-700'
-                                }`}>
-                                  {comment.newStatus}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-start justify-between">
-                              <p className="text-xs text-gray-600 leading-relaxed flex-1 mr-2">
-                                {comment.comment}
-                              </p>
-                              
-                              <div className="flex items-center space-x-1">
-                                <button
-                                  onClick={() => handleEditComment(comment.id, comment.comment)}
-                                  className="p-1 text-gray-400 hover:text-blue-600 transition-colors duration-200"
-                                  title="Modifier le commentaire"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </button>
-                                
-                                <button
-                                  onClick={() => handleQuickStatusChange(alert.id, comment.newStatus === 'NOUVELLE' ? 'EN_COURS' : 'TRAITEE')}
-                                  className="p-1 text-gray-400 hover:text-green-600 transition-colors duration-200"
-                                  title="Changer le statut"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    </div>
-                </div>
-              )}
               </div>
             );
           })}
@@ -763,50 +658,220 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
         </div>
       )}
 
-      {/* Modal d'édition de commentaire */}
-      {showEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4" style={{ zIndex: 9999, minHeight: '100vh' }}>
-          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full mt-8">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Modifier le commentaire
-            </h3>
-            
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Commentaire *
-              </label>
-              <textarea
-                value={editCommentText}
-                onChange={(e) => setEditCommentText(e.target.value)}
-                placeholder="Modifiez le commentaire..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                rows={4}
-                required
-              />
+      {/* Modal de détails complet */}
+      {showDetailModal && selectedAlert && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50" onClick={handleCloseDetailModal}>
+          <div 
+            className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header du modal */}
+            <div className={`p-6 ${getCardColors(selectedAlert.status).header} border-b border-gray-200`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-4">
+                  <div className="text-4xl">{getMoodIcon(selectedAlert.childMood)}</div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-800">
+                      {selectedAlert.student.firstName} {selectedAlert.student.lastName}
+                    </h2>
+                    <p className="text-gray-600">{selectedAlert.student.className}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCloseDetailModal}
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Badges de statut */}
+              <div className="flex items-center space-x-2">
+                <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold border-2 ${getRiskLevelColor(selectedAlert.riskLevel)}`}>
+                  {selectedAlert.riskLevel} • Score: {selectedAlert.riskScore}/100
+                </span>
+                <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold border-2 ${getCardColors(selectedAlert.status).badge}`}>
+                  {getStatusText(selectedAlert.status)}
+                </span>
+                <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                  {formatDate(selectedAlert.createdAt)}
+                </span>
+              </div>
             </div>
 
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowEditModal(false);
-                  setSelectedCommentId(null);
-                  setEditCommentText('');
-                }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors duration-200"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={submitEditComment}
-                disabled={!editCommentText.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                Modifier
-              </button>
+            {/* Contenu scrollable */}
+            <div className="overflow-y-auto max-h-[calc(90vh-250px)] p-6">
+              <div className="space-y-6">
+                {/* Analyse IA */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border-2 border-blue-200">
+                  <h3 className="text-lg font-bold text-blue-900 mb-3 flex items-center">
+                    <TrendingUp className="w-5 h-5 mr-2" />
+                    Analyse IA
+                  </h3>
+                  <p className="text-blue-800 leading-relaxed">{selectedAlert.aiSummary}</p>
+                </div>
+
+                {/* Recommandation */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-5 border-2 border-green-200">
+                  <h3 className="text-lg font-bold text-green-900 mb-3 flex items-center">
+                    <Shield className="w-5 h-5 mr-2" />
+                    Recommandation
+                  </h3>
+                  <p className="text-green-800 leading-relaxed">{selectedAlert.aiAdvice}</p>
+                </div>
+
+                {/* Informations détaillées */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-800 mb-3">Informations élève</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-600">Nom complet :</span>
+                        <span className="text-gray-800">{selectedAlert.student.firstName} {selectedAlert.student.lastName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-600">Classe :</span>
+                        <span className="text-gray-800">{selectedAlert.student.className}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-600">Humeur :</span>
+                        <span className="text-gray-800">{selectedAlert.childMood}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-800 mb-3">Détails techniques</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-600">Source :</span>
+                        <span className="text-gray-800">{selectedAlert.sourceType}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-600">ID Alerte :</span>
+                        <span className="text-gray-800 text-xs font-mono">{selectedAlert.id.slice(0, 12)}...</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-600">ID Source :</span>
+                        <span className="text-gray-800 text-xs font-mono">{selectedAlert.sourceId.slice(0, 12)}...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Historique des commentaires */}
+                <div className="bg-white rounded-2xl p-5 border-2 border-gray-200">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <Calendar className="w-5 h-5 mr-2" />
+                    Historique du suivi ({alertComments.length})
+                  </h3>
+                  
+                  {loadingComments ? (
+                    <div className="flex items-center justify-center py-8">
+                      <RefreshCw className="w-6 h-6 text-gray-400 animate-spin mr-3" />
+                      <span className="text-gray-600">Chargement de l'historique...</span>
+                    </div>
+                  ) : alertComments.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>Aucun commentaire pour le moment</p>
+                      <p className="text-sm mt-2">Les changements de statut et commentaires apparaîtront ici</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {alertComments.map((comment) => (
+                        <div key={comment.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-semibold">
+                                {comment.agentName.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-gray-800">{comment.agentName}</p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(comment.createdAt).toLocaleString('fr-FR', {
+                                    day: '2-digit',
+                                    month: 'long',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              {comment.oldStatus && (
+                                <>
+                                  <span className="text-xs px-2 py-1 rounded bg-gray-200 text-gray-700">
+                                    {getStatusText(comment.oldStatus)}
+                                  </span>
+                                  <span className="text-gray-400">→</span>
+                                </>
+                              )}
+                              <span className={`text-xs px-2 py-1 rounded font-medium ${
+                                comment.newStatus === 'NOUVELLE' ? 'bg-red-100 text-red-700' :
+                                comment.newStatus === 'EN_COURS' ? 'bg-orange-100 text-orange-700' :
+                                'bg-green-100 text-green-700'
+                              }`}>
+                                {getStatusText(comment.newStatus)}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <p className="text-sm text-gray-700 leading-relaxed pl-11">{comment.comment}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer avec actions */}
+            <div className="p-6 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <AlertCircle className="w-4 h-4" />
+                <span>Créé le : {formatDate(selectedAlert.createdAt)}</span>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={handleCloseDetailModal}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Fermer
+                </button>
+                
+                {selectedAlert.status === 'NOUVELLE' && (
+                  <button
+                    onClick={() => {
+                      handleCloseDetailModal();
+                      handleStatusChange(selectedAlert.id, 'EN_COURS');
+                    }}
+                    className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all duration-200 font-medium"
+                  >
+                    Prendre en charge
+                  </button>
+                )}
+                
+                {selectedAlert.status === 'EN_COURS' && (
+                  <button
+                    onClick={() => {
+                      handleCloseDetailModal();
+                      handleStatusChange(selectedAlert.id, 'TRAITEE');
+                    }}
+                    className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all duration-200 font-medium"
+                  >
+                    Marquer comme traitée
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

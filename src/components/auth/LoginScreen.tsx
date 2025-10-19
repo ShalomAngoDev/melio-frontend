@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { School, Users, Shield, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Users, Shield, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { logoIcon, fullLogo } from '../../assets/images';
 import { useToast } from '../../contexts/ToastContext';
 import { handleAuthError } from '../../utils/auth-error-handler';
+import PrivacyPolicy from '../PrivacyPolicy';
+import TermsOfService from '../TermsOfService';
+// import ReCaptcha, { ReCaptchaRef } from '../common/ReCaptcha';
 
 interface LoginScreenProps {
   onShowAdminLogin?: () => void;
@@ -16,9 +19,28 @@ export default function LoginScreen({ onShowAdminLogin }: LoginScreenProps) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showDemo, setShowDemo] = useState(false);
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const [showTermsOfService, setShowTermsOfService] = useState(false);
+  // const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  // const [captchaError, setCaptchaError] = useState('');
+  // const recaptchaRef = useRef<ReCaptchaRef>(null);
   
   const { agentLogin } = useAuth();
+
+  // const handleCaptchaVerify = (token: string | null) => {
+  //   setCaptchaToken(token);
+  //   setCaptchaError('');
+  // };
+
+  // const handleCaptchaExpire = () => {
+  //   setCaptchaToken(null);
+  //   setCaptchaError('Le captcha a expiré. Veuillez le refaire.');
+  // };
+
+  // const handleCaptchaError = () => {
+  //   setCaptchaToken(null);
+  //   setCaptchaError('Erreur lors de la vérification du captcha.');
+  // };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,9 +49,22 @@ export default function LoginScreen({ onShowAdminLogin }: LoginScreenProps) {
     if (isLoading) {
       return;
     }
+
+    // Validation côté client
+    if (!schoolCode.trim() || !email.trim() || !password.trim()) {
+      setError('Veuillez remplir tous les champs');
+      return;
+    }
+
+    // Vérification du captcha (commenté temporairement)
+    // if (!captchaToken) {
+    //   setCaptchaError('Veuillez compléter la vérification reCAPTCHA');
+    //   return;
+    // }
     
     setIsLoading(true);
     setError('');
+    // setCaptchaError('');
 
     try {
       await agentLogin(schoolCode.toUpperCase(), email, password);
@@ -37,185 +72,238 @@ export default function LoginScreen({ onShowAdminLogin }: LoginScreenProps) {
       showSuccess('Connexion réussie !');
     } catch (err: any) {
       handleAuthError(err, setError, showError);
+      // Reset captcha en cas d'erreur (commenté)
+      // recaptchaRef.current?.reset();
+      // setCaptchaToken(null);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const demoCredentials = [
-    { 
-      school: 'JMO75-01', 
-      email: 'agent@college-victor-hugo.fr', 
-      password: 'agent123', 
-      name: 'Agent Collège Victor Hugo', 
-      description: 'Gestion des élèves et alertes' 
-    }
-  ];
 
-  const quickLogin = async (school: string, email: string, password: string) => {
-    setSchoolCode(school);
-    setEmail(email);
-    setPassword(password);
-    
-    // Utiliser la même logique que handleSubmit pour éviter les problèmes
-    if (isLoading) {
-      return;
-    }
-    
-    setIsLoading(true);
-    setError('');
+  // Afficher les pages de politique et conditions
+  if (showPrivacyPolicy) {
+    return <PrivacyPolicy onBack={() => setShowPrivacyPolicy(false)} />;
+  }
 
-    try {
-      await agentLogin(school, email, password);
-      showSuccess('Connexion réussie !');
-    } catch (err: any) {
-      handleAuthError(err, setError, showError);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  if (showTermsOfService) {
+    return <TermsOfService onBack={() => setShowTermsOfService(false)} />;
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-pink-50 via-blue-50 to-purple-50">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="mb-3 flex justify-center">
-            <img src={fullLogo} alt="Melio" className="h-10 w-auto" />
-          </div>
-          <p className="text-gray-600 text-lg">Interface de gestion pour les écoles</p>
-          <div className="flex items-center justify-center mt-4 space-x-4 text-sm text-gray-500">
-            <div className="flex items-center">
-              <Shield className="w-4 h-4 mr-1" />
-              <span>Sécurisé</span>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: 'url(https://images.pexels.com/photos/6437585/pexels-photo-6437585.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080&fit=crop)'
+        }}
+      ></div>
+      
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-900/70 via-indigo-900/60 to-purple-900/70"></div>
+      
+      {/* Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-200/20 to-indigo-300/20 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-indigo-200/20 to-purple-300/20 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-blue-100/10 to-purple-100/10 rounded-full blur-3xl"></div>
+      </div>
+
+      {/* Main Content */}
+      <div className="relative z-10 w-full max-w-6xl mx-auto">
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          {/* Left Side - Branding */}
+          <div className="text-center lg:text-left text-white">
+            <div className="mb-8">
+              <img src={fullLogo} alt="Melio" className="h-20 w-auto mx-auto lg:mx-0 mb-6" />
+              <h1 className="text-5xl lg:text-6xl font-bold mb-6">
+                Bienvenue sur
+                <span 
+                  className="block"
+                  style={{
+                    background: 'linear-gradient(135deg, #895cf1, #d8268d)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text'
+                  }}
+                >
+                  Melio
+                </span>
+              </h1>
+              <p className="text-xl text-blue-100 mb-8 max-w-lg mx-auto lg:mx-0 leading-relaxed">
+                Plateforme sécurisée pour l'accompagnement des jeunes en milieu scolaire
+              </p>
             </div>
-            <div className="flex items-center">
-              <img src={logoIcon} alt="Melio" className="w-4 h-4 mr-1" />
-              <span>Confidentiel</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Login Form */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl p-8 border border-white/20">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Role Selection - Web app is only for staff */}
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center p-4 rounded-2xl border-2 border-blue-500 bg-blue-50 text-blue-700">
-                <Users className="w-6 h-6 mr-2" />
-                <div className="text-sm font-medium">Agent social</div>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">Interface web réservée aux agents sociaux</p>
-            </div>
-
-            {/* School Code */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Code école
-              </label>
-              <input
-                type="text"
-                value={schoolCode}
-                onChange={(e) => setSchoolCode(e.target.value.toUpperCase())}
-                className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200"
-                placeholder="Ex: COLLEGE2024"
-                required
-              />
-            </div>
-
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200"
-                placeholder="Ex: agent@ecole.fr"
-                required
-              />
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Mot de passe
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all duration-200"
-                placeholder="Votre mot de passe"
-                required
-              />
-            </div>
-
-            {error && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-2xl font-medium hover:from-pink-600 hover:to-purple-700 focus:ring-4 focus:ring-pink-200 disabled:opacity-50 transition-all duration-200 shadow-lg"
-            >
-              {isLoading ? 'Connexion...' : 'Se connecter'}
-            </button>
-          </form>
-
-          {/* Demo Access */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <button
-              onClick={() => setShowDemo(!showDemo)}
-              className="flex items-center justify-center w-full text-sm text-gray-600 hover:text-gray-800 transition-colors duration-200"
-            >
-              {showDemo ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
-              {showDemo ? 'Masquer' : 'Voir'} les comptes de démonstration
-            </button>
             
-            {showDemo && (
-              <div className="mt-4 space-y-3">
-                {demoCredentials.map((cred, index) => (
-                  <button
-                    key={index}
-                    onClick={() => quickLogin(cred.school, cred.email, cred.password)}
-                    className="w-full p-3 text-left rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 transition-all duration-200"
-                  >
-                    <div className="font-medium text-gray-800">{cred.name}</div>
-                    <div className="text-xs text-gray-500 mt-1">{cred.description}</div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      {cred.school} • {cred.email}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto lg:mx-0">
+                    <div className="relative flex items-center space-x-3 p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/60 overflow-hidden group">
+                      {/* Animation de lumière */}
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-blue-300/40 to-transparent transform -skew-x-12 -translate-x-full animate-[light-sweep_3s_ease-in-out_infinite]"></div>
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500/50 to-indigo-600/50 rounded-xl flex items-center justify-center relative z-10">
+                        <Shield className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="relative z-10">
+                        <h3 className="text-base font-bold text-gray-900 mb-1">Sécurisé</h3>
+                        <p className="text-sm text-gray-700 font-medium">Chiffrement de bout en bout</p>
+                      </div>
                     </div>
-                  </button>
-                ))}
+                    <div className="relative flex items-center space-x-3 p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/60 overflow-hidden group">
+                      {/* Animation de lumière */}
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-purple-300/50 to-transparent transform -skew-x-12 -translate-x-full animate-[light-sweep_3s_ease-in-out_infinite_1.5s]"></div>
+                      <div className="w-12 h-12 bg-gradient-to-br from-indigo-500/50 to-purple-600/50 rounded-xl flex items-center justify-center relative z-10">
+                        <Users className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="relative z-10">
+                        <h3 className="text-base font-bold text-gray-900 mb-1">Collaboratif</h3>
+                        <p className="text-sm text-gray-700 font-medium">Travail d'équipe facilité</p>
+                      </div>
+                    </div>
+                  </div>
+          </div>
+
+                {/* Right Side - Login Form */}
+                <div className="flex justify-center lg:justify-end">
+                  <div className="w-full max-w-lg">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-10 border border-white/30">
+                <div className="text-center mb-8">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Connexion Équipe</h2>
+                  <p className="text-gray-600">Accédez à votre espace de travail sécurisé</p>
+                </div>
+
+                      <form onSubmit={handleSubmit} className="space-y-5">
+                  {/* School Code */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Code école
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolCode}
+                      onChange={(e) => setSchoolCode(e.target.value.toUpperCase())}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
+                      placeholder="Ex: COLLEGE2024"
+                      required
+                    />
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
+                      placeholder="Ex: agent@ecole.fr"
+                      required
+                    />
+                  </div>
+
+                  {/* Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Mot de passe
+                    </label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
+                      placeholder="Votre mot de passe"
+                      required
+                    />
+                  </div>
+
+                        {error && (
+                          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
+                            {error}
+                          </div>
+                        )}
+
+                        {/* reCAPTCHA - Commenté temporairement */}
+                        {/* <div className="mt-3">
+                          <ReCaptcha
+                            ref={recaptchaRef}
+                            onVerify={handleCaptchaVerify}
+                            onExpire={handleCaptchaExpire}
+                            onError={handleCaptchaError}
+                            theme="light"
+                            size="normal"
+                          />
+                          {captchaError && (
+                            <p className="text-red-600 text-sm mt-2 text-center">{captchaError}</p>
+                          )}
+                        </div> */}
+
+                        <button
+                          type="submit"
+                          disabled={isLoading || !schoolCode.trim() || !email.trim() || !password.trim()}
+                          className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 focus:ring-4 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
+                        >
+                          {isLoading ? 'Connexion...' : 'Se connecter'}
+                        </button>
+                </form>
+
+                      {/* Identifiants oubliés */}
+                      <div className="mt-3 text-center">
+                        <p className="text-sm text-gray-600">
+                          Identifiants oubliés ? Contactez-le{' '}
+                          <a href="tel:+33745697503" className="text-blue-600 hover:text-blue-800 font-medium">
+                            +33 0745697503
+                          </a>
+                        </p>
+                      </div>
+
+                      {/* Conditions d'utilisation */}
+                      <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <p className="text-xs text-gray-600 text-center leading-relaxed">
+                          En me connectant, j'accepte les conditions d'utilisation du service Melio, 
+                          notamment en matière de données personnelles et de confidentialité.
+                        </p>
+                      </div>
+
+                      {/* reCAPTCHA */}
+                      <div className="mt-3 flex items-center justify-center space-x-2 text-xs text-gray-500">
+                        <div className="flex items-center space-x-1">
+                          <div className="w-4 h-4 bg-gray-300 rounded flex items-center justify-center">
+                            <span className="text-xs font-bold text-gray-600">✓</span>
+                          </div>
+                          <span>Protection par reCAPTCHA</span>
+                        </div>
+                        <span>•</span>
+                        <button 
+                          onClick={() => setShowPrivacyPolicy(true)}
+                          className="text-blue-600 hover:text-blue-800 transition-colors duration-200"
+                        >
+                          Confidentialité
+                        </button>
+                        <span>•</span>
+                        <button 
+                          onClick={() => setShowTermsOfService(true)}
+                          className="text-blue-600 hover:text-blue-800 transition-colors duration-200"
+                        >
+                          Conditions
+                        </button>
+                      </div>
+
+                {/* Admin Access */}
+                {onShowAdminLogin && (
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={onShowAdminLogin}
+                      className="text-sm text-purple-600 hover:text-purple-800 font-medium transition-colors duration-200"
+                    >
+                      Accès administrateur Melio →
+                    </button>
+                  </div>
+                )}
+
               </div>
-            )}
+            </div>
           </div>
-        </div>
-
-        {/* Admin Access */}
-        {onShowAdminLogin && (
-          <div className="mt-6 text-center">
-            <button
-              onClick={onShowAdminLogin}
-              className="text-sm text-purple-600 hover:text-purple-800 font-medium transition-colors duration-200"
-            >
-              Accès administrateur Melio →
-            </button>
-          </div>
-        )}
-
-        {/* Security Notice */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
-            Interface sécurisée pour la gestion des signalements.<br />
-            Accès réservé aux agents sociaux et administrateurs d'école.
-          </p>
         </div>
       </div>
     </div>

@@ -22,6 +22,13 @@ export default function StaffDashboard() {
   useEffect(() => {
     const loadNewAlertsCount = async () => {
       try {
+        // Vérifier l'authentification avant de faire l'appel API
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+          console.log('Utilisateur non authentifié, ne pas charger les alertes');
+          return;
+        }
+        
         const alerts = await alertService.getAlerts('NOUVELLE');
         const currentCount = alerts.length;
         
@@ -39,7 +46,10 @@ export default function StaffDashboard() {
         }
       } catch (error) {
         console.error('Erreur lors du chargement du nombre d\'alertes:', error);
-        setNewAlertsCount(0);
+        // En cas d'erreur 401, ne pas afficher d'erreur car c'est normal si non connecté
+        if (error.response?.status !== 401) {
+          setNewAlertsCount(0);
+        }
       }
     };
 
@@ -55,10 +65,14 @@ export default function StaffDashboard() {
   useEffect(() => {
     const loadNewReportsCount = async () => {
       try {
-        const schoolId = user?.schoolId || '';
-        if (!schoolId) return;
+        // Vérifier l'authentification avant de faire l'appel API
+        const token = localStorage.getItem('accessToken');
+        if (!token || !user?.schoolId) {
+          console.log('Utilisateur non authentifié, ne pas charger les rapports');
+          return;
+        }
         
-        const reports = await reportService.getReports(schoolId, 'NOUVEAU');
+        const reports = await reportService.getReports(user.schoolId, 'NOUVEAU');
         const currentCount = reports.length;
         
         // Si l'agent a consulté les signalements et qu'il n'y en a plus de nouveaux, cacher le badge
@@ -75,7 +89,10 @@ export default function StaffDashboard() {
         }
       } catch (error) {
         console.error('Erreur lors du chargement du nombre de signalements:', error);
-        setNewReportsCount(0);
+        // En cas d'erreur 401, ne pas afficher d'erreur car c'est normal si non connecté
+        if (error.response?.status !== 401) {
+          setNewReportsCount(0);
+        }
       }
     };
 

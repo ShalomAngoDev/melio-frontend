@@ -161,3 +161,7 @@ Le problème de "flash + recharge" devrait maintenant être définitivement rés
 - `web/src/components/auth/AdminLoginScreen.tsx` - Gestion d'erreur centralisée
 - `web/src/utils/auth-error-handler.ts` - Nouveau gestionnaire d'erreurs
 - `web/src/App.tsx` - Transitions optimisées
+
+
+
+
