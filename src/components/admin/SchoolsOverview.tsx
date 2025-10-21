@@ -3,17 +3,18 @@ import {
   School, 
   AlertTriangle, 
   MapPin, 
-  Calendar,
-  Eye,
-  Settings,
   Plus,
   Loader2,
-  Filter,
   ChevronLeft,
   ChevronRight,
-  EyeOff
+  Search,
+  X,
+  Users,
+  Bell,
+  FileText
 } from 'lucide-react';
 import { adminService } from '../../services/api';
+import SchoolDetails from './SchoolDetails';
 
 interface SchoolData {
   id: string;
@@ -49,35 +50,40 @@ export default function SchoolsOverview({ onAddSchool }: SchoolsOverviewProps) {
   const [schools, setSchools] = useState<SchoolData[]>([]);
   const [filteredSchools, setFilteredSchools] = useState<SchoolData[]>([]);
   const [displayedSchools, setDisplayedSchools] = useState<SchoolData[]>([]);
-  const [selectedSchool, setSelectedSchool] = useState<string | null>(null);
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showFilters, setShowFilters] = useState(() => {
-    const saved = localStorage.getItem('schools-showFilters');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(22);
+  const [itemsPerPage] = useState(12);
 
-  // Sauvegarder l'état des filtres dans localStorage
-  useEffect(() => {
-    localStorage.setItem('schools-showFilters', JSON.stringify(showFilters));
-  }, [showFilters]);
-
-  // Appliquer les filtres
+  // Appliquer les filtres et la recherche
   useEffect(() => {
     let filtered = schools;
     
+    // Filtre par statut
     if (filter === 'active') {
-      filtered = schools.filter(school => school.status === 'ACTIVE');
+      filtered = filtered.filter(school => school.status === 'ACTIVE');
     } else if (filter === 'inactive') {
-      filtered = schools.filter(school => school.status === 'INACTIVE');
+      filtered = filtered.filter(school => school.status === 'INACTIVE');
+    }
+    
+    // Filtre par recherche
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(school =>
+        school.name.toLowerCase().includes(query) ||
+        school.code.toLowerCase().includes(query) ||
+        school.city.toLowerCase().includes(query) ||
+        school.uaiCode.toLowerCase().includes(query) ||
+        school.level.toLowerCase().includes(query)
+      );
     }
     
     setFilteredSchools(filtered);
     setCurrentPage(1); // Reset à la première page
-  }, [schools, filter]);
+  }, [schools, filter, searchQuery]);
 
   // Appliquer la pagination
   useEffect(() => {
@@ -147,13 +153,54 @@ export default function SchoolsOverview({ onAddSchool }: SchoolsOverviewProps) {
     newReports: acc.newReports + school.newReports,
   }), { students: 0, staff: 0, alerts: 0, criticalAlerts: 0, resolvedAlerts: 0, reports: 0, newReports: 0 });
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
+  // Fonction pour recharger les écoles
+  const reloadSchools = async () => {
+    try {
+      const schoolsData = await adminService.getSchools();
+      const schoolsWithStats = await Promise.all(
+        schoolsData.map(async (school) => {
+          try {
+            const stats = await adminService.getSchoolStats(school.id);
+            return {
+              ...school,
+              students: stats.totalStudents,
+              staff: 1,
+              alerts: stats.totalAlerts,
+              criticalAlerts: stats.alertsByRiskLevel?.CRITIQUE || 0,
+              resolvedAlerts: stats.alertsByStatus?.TRAITEE || 0,
+              reports: stats.totalReports,
+              newReports: stats.reportsByStatus?.NOUVEAU || 0,
+            };
+          } catch (error) {
+            return {
+              ...school,
+              students: 0,
+              staff: 1,
+              alerts: 0,
+              criticalAlerts: 0,
+              resolvedAlerts: 0,
+              reports: 0,
+              newReports: 0,
+            };
+          }
+        })
+      );
+      setSchools(schoolsWithStats);
+    } catch (error) {
+      console.error('Erreur lors du rechargement:', error);
+    }
   };
+
+  // Si une école est sélectionnée, afficher ses détails
+  if (selectedSchoolId) {
+    return (
+      <SchoolDetails
+        schoolId={selectedSchoolId}
+        onBack={() => setSelectedSchoolId(null)}
+        onUpdate={reloadSchools}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
@@ -181,285 +228,202 @@ export default function SchoolsOverview({ onAddSchool }: SchoolsOverviewProps) {
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 mb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <School className="w-8 h-8 text-blue-500 mr-3" />
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">Gestion des Écoles</h2>
-              <p className="text-gray-600">Vue d'ensemble de toutes les écoles connectées</p>
-            </div>
+    <div className="space-y-6">
+      {/* Header avec recherche */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Gestion des Écoles</h2>
+            <p className="text-gray-600">
+              {filteredSchools.length} école(s) • {totalStats.students} élèves
+            </p>
           </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={onAddSchool}
-              className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all duration-200 flex items-center text-sm font-medium"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Ajouter une école
-            </button>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
-              title="Filtres"
-            >
-              <Filter className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={onAddSchool}
+            className="flex items-center px-6 py-3 bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl font-medium hover:from-indigo-600 hover:to-blue-700 transition-all shadow-lg"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Nouvelle école
+          </button>
         </div>
 
-      </div>
-
-      {/* Filtres et Statistiques */}
-      {showFilters && (
-        <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 mb-4">
-          <div className="space-y-4">
-            {/* Boutons de filtre */}
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setFilter('all')}
-                className={`px-3 py-1.5 rounded-lg font-medium transition-all duration-200 text-sm ${
-                  filter === 'all'
-                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Toutes ({schools.length})
-              </button>
-              <button
-                onClick={() => setFilter('active')}
-                className={`px-3 py-1.5 rounded-lg font-medium transition-all duration-200 text-sm ${
-                  filter === 'active'
-                    ? 'bg-green-100 text-green-700 border border-green-200'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Actives ({schools.filter(s => s.status === 'ACTIVE').length})
-              </button>
-              <button
-                onClick={() => setFilter('inactive')}
-                className={`px-3 py-1.5 rounded-lg font-medium transition-all duration-200 text-sm ${
-                  filter === 'inactive'
-                    ? 'bg-red-100 text-red-700 border border-red-200'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Inactives ({schools.filter(s => s.status === 'INACTIVE').length})
-              </button>
-            </div>
-
-            {/* Global Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
-                <div className="text-lg font-bold text-blue-600">{totalStats.students}</div>
-                <div className="text-xs text-blue-700">Élèves total</div>
-              </div>
-              <div className="bg-green-50 rounded-xl p-3 border border-green-100">
-                <div className="text-lg font-bold text-green-600">{totalStats.staff}</div>
-                <div className="text-xs text-green-700">Agents total</div>
-              </div>
-              <div className="bg-orange-50 rounded-xl p-3 border border-orange-100">
-                <div className="text-lg font-bold text-orange-600">{totalStats.alerts}</div>
-                <div className="text-xs text-orange-700">Alertes total</div>
-              </div>
-              <div className="bg-purple-50 rounded-xl p-3 border border-purple-100">
-                <div className="text-lg font-bold text-purple-600">{totalStats.resolvedAlerts}</div>
-                <div className="text-xs text-purple-700">Résolues</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Zone de contenu scrollable */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto">
-          {displayedSchools.length === 0 ? (
-            <div className="bg-white/60 backdrop-blur-sm rounded-3xl p-8 text-center shadow-lg border border-white/20">
-              <School className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-2">Aucune école trouvée</h3>
-              <p className="text-gray-500">
-                {filter === 'active' ? 'Aucune école active' : 
-                 filter === 'inactive' ? 'Aucune école inactive' : 
-                 'Aucune école enregistrée'}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {displayedSchools.map((school) => {
-                const isExpanded = selectedSchool === school.code;
-                
-                return (
-                  <div
-                    key={school.code}
-                    className={`bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden transition-all duration-200 ${
-                      school.status === 'INACTIVE' ? 'opacity-60' : ''
-                    }`}
-                  >
-                    <div className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-3">
-                            <div className="bg-blue-100 p-2 rounded-xl">
-                              <School className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div>
-                              <h3 className="text-lg font-bold text-gray-800">{school.name}</h3>
-                              <div className="flex items-center space-x-3 text-xs text-gray-600">
-                                <span className="flex items-center">
-                                  <MapPin className="w-3 h-3 mr-1" />
-                                  {school.city}
-                                </span>
-                                <span className="flex items-center">
-                                  <Calendar className="w-3 h-3 mr-1" />
-                                  {formatDate(school.createdAt)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              school.status === 'ACTIVE' 
-                                ? 'bg-green-100 text-green-700' 
-                                : 'bg-red-100 text-red-700'
-                            }`}>
-                              {school.status === 'ACTIVE' ? 'Active' : 'Inactive'}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                            <div className="bg-gray-50 rounded-xl p-3 text-center">
-                              <div className="text-lg font-bold text-gray-800">{school.students}</div>
-                              <div className="text-xs text-gray-600">Élèves</div>
-                            </div>
-                            <div className="bg-gray-50 rounded-xl p-3 text-center">
-                              <div className="text-lg font-bold text-gray-800">{school.staff}</div>
-                              <div className="text-xs text-gray-600">Agents</div>
-                            </div>
-                            <div className="bg-gray-50 rounded-xl p-3 text-center">
-                              <div className="text-lg font-bold text-gray-800">{school.alerts}</div>
-                              <div className="text-xs text-gray-600">Alertes</div>
-                            </div>
-                            <div className="bg-gray-50 rounded-xl p-3 text-center">
-                              <div className="text-lg font-bold text-gray-800">{school.reports}</div>
-                              <div className="text-xs text-gray-600">Signalements</div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => setSelectedSchool(selectedSchool === school.code ? null : school.code)}
-                            className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all duration-200"
-                          >
-                            <Settings className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      
-                      {isExpanded && (
-                        <div className="border-t border-gray-200 pt-4 mt-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                              <div>
-                                <h5 className="font-medium text-gray-700 mb-2 text-sm">Informations de l'école</h5>
-                                <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Adresse:</span>
-                                    <span className="font-medium">{school.address1}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Ville:</span>
-                                    <span className="font-medium">{school.city}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Code postal:</span>
-                                    <span className="font-medium">{school.postalCode}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Niveau:</span>
-                                    <span className="font-medium">{school.level}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Contact:</span>
-                                    <span className="font-medium">{school.contactName}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Email:</span>
-                                    <span className="font-medium">{school.contactEmail}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Téléphone:</span>
-                                    <span className="font-medium">{school.contactPhone}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Créé le:</span>
-                                    <span className="font-medium">{formatDate(school.createdAt)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Statut:</span>
-                                    <span className={`font-medium ${
-                                      school.status === 'ACTIVE' ? 'text-green-600' : 'text-red-600'
-                                    }`}>
-                                      {school.status === 'ACTIVE' ? 'Active' : 'Inactive'}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="space-y-3">
-                              <div>
-                                <h5 className="font-medium text-gray-700 mb-2 text-sm">Statistiques des alertes</h5>
-                                <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Total alertes:</span>
-                                    <span className="font-medium">{school.alerts}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Critiques:</span>
-                                    <span className="font-medium text-red-600">{school.criticalAlerts}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Résolues:</span>
-                                    <span className="font-medium text-green-600">{school.resolvedAlerts}</span>
-                                  </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Taux de résolution:</span>
-                                    <span className="font-medium">
-                                      {school.alerts > 0 ? Math.round((school.resolvedAlerts / school.alerts) * 100) : 0}%
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        {/* Barre de recherche */}
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Rechercher par nom, ville, code UAI ou niveau..."
+            className="w-full pl-12 pr-10 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
           )}
         </div>
       </div>
 
+      {/* Filtres rapides */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
+        <div className="flex items-center justify-between">
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all text-sm ${
+                filter === 'all'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Toutes • {schools.length}
+            </button>
+            <button
+              onClick={() => setFilter('active')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all text-sm ${
+                filter === 'active'
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Actives • {schools.filter(s => s.status === 'ACTIVE').length}
+            </button>
+            <button
+              onClick={() => setFilter('inactive')}
+              className={`px-4 py-2 rounded-xl font-medium transition-all text-sm ${
+                filter === 'inactive'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Inactives • {schools.filter(s => s.status === 'INACTIVE').length}
+            </button>
+          </div>
+
+          {/* Stats rapides */}
+          <div className="flex items-center space-x-4 text-sm text-gray-600">
+            <div className="flex items-center">
+              <Users className="w-4 h-4 mr-1 text-blue-500" />
+              <span className="font-medium">{totalStats.students}</span>
+              <span className="ml-1">élèves</span>
+            </div>
+            <div className="flex items-center">
+              <Bell className="w-4 h-4 mr-1 text-orange-500" />
+              <span className="font-medium">{totalStats.alerts}</span>
+              <span className="ml-1">alertes</span>
+            </div>
+            <div className="flex items-center">
+              <FileText className="w-4 h-4 mr-1 text-purple-500" />
+              <span className="font-medium">{totalStats.reports}</span>
+              <span className="ml-1">signalements</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Liste des écoles */}
+      {displayedSchools.length === 0 ? (
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-12 text-center shadow-lg border border-white/20">
+          <School className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-700 mb-2">
+            {searchQuery ? 'Aucun résultat' : 'Aucune école trouvée'}
+          </h3>
+          <p className="text-gray-500 mb-6">
+            {searchQuery 
+              ? 'Essayez avec d\'autres mots-clés'
+              : filter === 'active' ? 'Aucune école active' : 
+                filter === 'inactive' ? 'Aucune école inactive' : 
+                'Créez votre première école'
+            }
+          </p>
+          {!searchQuery && (
+            <button
+              onClick={onAddSchool}
+              className="px-6 py-3 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-colors"
+            >
+              Créer une école
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {displayedSchools.map((school) => (
+            <button
+              key={school.code}
+              onClick={() => setSelectedSchoolId(school.id)}
+              className={`bg-white/80 backdrop-blur-sm rounded-2xl p-5 shadow-lg border border-white/20 hover:shadow-xl transition-all text-left ${
+                school.status === 'INACTIVE' ? 'opacity-60' : ''
+              } hover:scale-[1.02] hover:border-indigo-300`}
+            >
+              {/* Header de la carte */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-indigo-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                    {school.name[0]}
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="font-semibold text-gray-800">{school.name}</h3>
+                    <div className="flex items-center text-xs text-gray-500">
+                      <MapPin className="w-3 h-3 mr-1" />
+                      {school.city}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Badge statut + code */}
+              <div className="flex items-center justify-between mb-3">
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  school.status === 'ACTIVE' 
+                    ? 'bg-green-100 text-green-700' 
+                    : 'bg-red-100 text-red-700'
+                }`}>
+                  {school.status === 'ACTIVE' ? '● Active' : '○ Inactive'}
+                </span>
+                <span className="text-xs text-gray-600 font-mono bg-gray-100 px-2 py-1 rounded">
+                  {school.code}
+                </span>
+              </div>
+
+              {/* Stats compactes */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-blue-50 rounded-lg p-2 text-center">
+                  <Users className="w-4 h-4 text-blue-600 mx-auto mb-1" />
+                  <div className="text-lg font-bold text-blue-600">{school.students}</div>
+                  <div className="text-xs text-blue-700">Élèves</div>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-2 text-center">
+                  <Bell className="w-4 h-4 text-orange-600 mx-auto mb-1" />
+                  <div className="text-lg font-bold text-orange-600">{school.alerts}</div>
+                  <div className="text-xs text-orange-700">Alertes</div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm rounded-2xl p-3 shadow-lg border border-white/20">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600">
-              Page {currentPage} sur {totalPages} • {displayedSchools.length} école(s) sur cette page
+              Page <span className="font-semibold">{currentPage}</span> sur <span className="font-semibold">{totalPages}</span>
+              <span className="mx-2">•</span>
+              <span className="font-semibold">{displayedSchools.length}</span> école(s)
             </div>
             
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-5 h-5" />
               </button>
               
               <div className="flex items-center space-x-1">
@@ -471,9 +435,9 @@ export default function SchoolsOverview({ onAddSchool }: SchoolsOverviewProps) {
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`w-7 h-7 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      className={`w-10 h-10 rounded-xl text-sm font-medium transition-all ${
                         isActive
-                          ? 'bg-blue-600 text-white'
+                          ? 'bg-indigo-500 text-white shadow-lg'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
@@ -486,9 +450,9 @@ export default function SchoolsOverview({ onAddSchool }: SchoolsOverviewProps) {
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-5 h-5" />
               </button>
             </div>
           </div>

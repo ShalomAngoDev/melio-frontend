@@ -3,7 +3,11 @@ import { BarChart3, TrendingUp, Users, Calendar, AlertTriangle, Activity, Loader
 import { useAuth } from '../../contexts/AuthContext';
 import { statisticsService } from '../../services/api';
 
-export default function StatisticsSection() {
+interface StatisticsSectionProps {
+  schoolId: string;
+}
+
+export default function StatisticsSection({ schoolId }: StatisticsSectionProps) {
   const { user } = useAuth();
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
   const [isLoading, setIsLoading] = useState(true);
@@ -18,17 +22,17 @@ export default function StatisticsSection() {
   // Charger les données
   useEffect(() => {
     const loadStatistics = async () => {
-      if (!user?.schoolId) return;
+      if (!schoolId) return;
       
       try {
         setIsLoading(true);
         setError(null);
         
         const [general, temporal, classes, trendsData] = await Promise.all([
-          statisticsService.getGeneralStats(user.schoolId, timeRange),
-          statisticsService.getTemporalStats(user.schoolId, timeRange),
-          statisticsService.getClassStats(user.schoolId),
-          statisticsService.getTrends(user.schoolId),
+          statisticsService.getGeneralStats(schoolId, timeRange),
+          statisticsService.getTemporalStats(schoolId, timeRange),
+          statisticsService.getClassStats(schoolId),
+          statisticsService.getTrends(schoolId),
         ]);
         
         setGeneralStats(general);
@@ -44,7 +48,7 @@ export default function StatisticsSection() {
     };
 
     loadStatistics();
-  }, [user?.schoolId, timeRange]);
+  }, [schoolId, timeRange]);
 
   if (isLoading) {
     return (

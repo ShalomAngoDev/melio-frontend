@@ -162,25 +162,13 @@ export interface SchoolInfo {
 
 // Services API
 export const authService = {
-  // Connexion agent
-  agentLogin: async (schoolCode: string, email: string, password: string) => {
-    const response = await api.post('/auth/agent/login', {
-      schoolCode,
+  // V2: Connexion Staff (Agents & Admins) - Route sécurisée
+  unifiedLogin: async (email: string, password: string) => {
+    const response = await api.post('/auth/staff/login', {
       email,
       password,
     }, {
-      withCredentials: true, // S'assurer que les cookies sont envoyés
-    });
-    return response.data;
-  },
-
-  // Connexion admin
-  adminLogin: async (email: string, password: string) => {
-    const response = await api.post('/auth/admin/login', {
-      email,
-      password,
-    }, {
-      withCredentials: true, // S'assurer que les cookies sont envoyés
+      withCredentials: true,
     });
     return response.data;
   },
@@ -230,6 +218,12 @@ export const schoolService = {
   // Récupérer les informations de l'école de l'agent connecté
   getMySchoolInfo: async (): Promise<SchoolInfo> => {
     const response = await api.get('/schools/me');
+    return response.data;
+  },
+
+  // Récupérer les informations d'une école spécifique (pour agents multi-écoles)
+  getSchoolInfo: async (schoolId: string): Promise<SchoolInfo> => {
+    const response = await api.get(`/schools/${schoolId}`);
     return response.data;
   },
 };
@@ -303,9 +297,10 @@ export interface AlertComment {
 }
 
 export const alertService = {
-  // Récupérer les alertes de l'établissement
-  getAlerts: async (status?: string, limit?: number, offset?: number): Promise<Alert[]> => {
+  // Récupérer les alertes de l'établissement (V2: support multi-écoles)
+  getAlerts: async (status?: string, limit?: number, offset?: number, schoolId?: string): Promise<Alert[]> => {
     const params = new URLSearchParams();
+    if (schoolId) params.append('schoolId', schoolId); // V2: Passer schoolId explicite
     if (status) params.append('status', status);
     if (limit) params.append('limit', limit.toString());
     if (offset) params.append('offset', offset.toString());
@@ -326,9 +321,11 @@ export const alertService = {
     return response.data;
   },
 
-  // Récupérer les statistiques des alertes
-  getAlertStats: async (): Promise<AlertStats> => {
-    const response = await api.get('/alerts/stats');
+  // Récupérer les statistiques des alertes (V2: support multi-écoles)
+  getAlertStats: async (schoolId?: string): Promise<AlertStats> => {
+    const params = new URLSearchParams();
+    if (schoolId) params.append('schoolId', schoolId); // V2: Passer schoolId explicite
+    const response = await api.get(`/alerts/stats?${params.toString()}`);
     return response.data;
   },
 
@@ -358,6 +355,12 @@ export interface Report {
   id: string;
   schoolId: string;
   studentId?: string;
+  student?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    className: string;
+  };
   content: string;
   urgency: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   anonymous: boolean;
@@ -775,9 +778,80 @@ export const adminService = {
     return response.data;
   },
 
+  // Assigner un agent existant à une école
+  assignAgentToSchool: async (schoolId: string, data: { agentId: string }): Promise<any> => {
+    const response = await api.post(`/admin/schools/${schoolId}/agents/assign`, data);
+    return response.data;
+  },
+
   // Supprimer un agent d'une école
   removeAgentFromSchool: async (schoolId: string, agentId: string): Promise<{ message: string }> => {
     const response = await api.delete(`/admin/schools/${schoolId}/agents/${agentId}`);
+    return response.data;
+  },
+
+  // ===== V2: GESTION GLOBALE DES AGENTS =====
+
+  // Récupérer tous les agents avec leurs écoles
+  getAllAgents: async (): Promise<Array<{
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    role: string;
+    schools: Array<{
+      id: string;
+      code: string;
+      name: string;
+      city: string;
+    }>;
+    createdAt: string;
+  }>> => {
+    const response = await api.get('/admin/agents');
+    return response.data;
+  },
+
+  // Créer un agent et l'attribuer à plusieurs écoles
+  createGlobalAgent: async (agentData: {
+    email: string;
+    password: string;
+    firstName?: string;
+    lastName?: string;
+    schoolIds: string[];
+  }): Promise<{
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    schools: Array<any>;
+    createdAt: string;
+  }> => {
+    const response = await api.post('/admin/agents', agentData);
+    return response.data;
+  },
+
+  // Modifier un agent (nom, prénom, écoles)
+  updateAgent: async (agentId: string, updateData: {
+    firstName?: string;
+    lastName?: string;
+    schoolIds?: string[];
+  }): Promise<{
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    schools: Array<any>;
+  }> => {
+    const response = await api.put(`/admin/agents/${agentId}`, updateData);
+    return response.data;
+  },
+
+  // Supprimer un agent complètement
+  deleteAgent: async (agentId: string): Promise<{
+    message: string;
+    schoolsAffected: number;
+  }> => {
+    const response = await api.delete(`/admin/agents/${agentId}`);
     return response.data;
   },
 };

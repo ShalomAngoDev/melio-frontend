@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService } from '../services/api';
 
+interface SchoolInfo {
+  id: string;
+  code: string;
+  name: string;
+}
+
 interface User {
   id: string;
   name: string;
@@ -8,13 +14,13 @@ interface User {
   schoolCode?: string;
   schoolId?: string;
   email?: string;
+  schools?: SchoolInfo[]; // V2: Liste des écoles pour agents multi-écoles
 }
 
 interface AuthContextType {
   user: User | null;
   studentLogin: (schoolCode: string, studentIdentifier: string) => Promise<boolean>;
-  agentLogin: (schoolCode: string, email: string, password: string) => Promise<boolean>;
-  adminLogin: (email: string, password: string) => Promise<boolean>;
+  unifiedLogin: (email: string, password: string) => Promise<boolean>; // V2: Méthode principale pour agents/admins
   logout: () => void;
   isLoading: boolean;
 }
@@ -75,55 +81,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const agentLogin = async (schoolCode: string, email: string, password: string): Promise<boolean> => {
+  // ===== UNIFIED LOGIN (V2) - Remplace agentLogin et adminLogin =====
+  const unifiedLogin = async (email: string, password: string): Promise<boolean> => {
     try {
-      const response = await authService.agentLogin(schoolCode, email, password);
+      const response = await authService.unifiedLogin(email, password);
       
-      if (!response.agent) {
-        throw new Error('No agent data in response');
+      // Déterminer si c'est un admin ou un agent
+      if (response.admin) {
+        const newUser: User = {
+          id: response.admin.id,
+          name: response.admin.email,
+          role: 'admin',
+          email: response.admin.email
+        };
+
+        setUser(newUser);
+        localStorage.setItem('melio_user', JSON.stringify(newUser));
+        localStorage.setItem('accessToken', response.accessToken);
+        localStorage.setItem('refreshToken', response.refreshToken);
+        return true;
+      } 
+      
+      if (response.agent) {
+        const newUser: User = {
+          id: response.agent.id,
+          name: response.agent.email,
+          role: 'staff',
+          email: response.agent.email,
+          schoolId: response.agent.currentSchoolId,
+          schools: response.agent.schools || [],
+          // Utiliser le code de la première école comme schoolCode
+          schoolCode: response.agent.schools && response.agent.schools.length > 0 
+            ? response.agent.schools[0].code 
+            : undefined
+        };
+
+        setUser(newUser);
+        localStorage.setItem('melio_user', JSON.stringify(newUser));
+        localStorage.setItem('accessToken', response.accessToken);
+        localStorage.setItem('refreshToken', response.refreshToken);
+        return true;
       }
 
-      const newUser: User = {
-        id: response.agent.id,
-        name: email, // Agent n'a pas de firstName/lastName dans la réponse
-        role: 'staff',
-        schoolCode: schoolCode,
-        schoolId: response.agent.schoolId,
-        email: response.agent.email
-      };
-
-      setUser(newUser);
-      localStorage.setItem('melio_user', JSON.stringify(newUser));
-      localStorage.setItem('accessToken', response.accessToken);
-      localStorage.setItem('refreshToken', response.refreshToken);
-      return true;
-    } catch (error: any) {
-      console.error('Agent login error:', error);
-      // Propager l'erreur pour que le composant puisse l'afficher
-      throw error;
-    }
-  };
-
-  const adminLogin = async (email: string, password: string): Promise<boolean> => {
-    try {
-      const response = await authService.adminLogin(email, password);
-      
-      if (!response.admin) {
-        throw new Error('No admin data in response');
-      }
-
-      const newUser: User = {
-        id: response.admin.id,
-        name: response.admin.email, // Admin n'a pas de firstName/lastName
-        role: 'admin',
-        email: response.admin.email
-      };
-
-      setUser(newUser);
-      localStorage.setItem('melio_user', JSON.stringify(newUser));
-      localStorage.setItem('accessToken', response.accessToken);
-      localStorage.setItem('refreshToken', response.refreshToken);
-      return true;
+      throw new Error('No valid user data in response');
     } catch (error: any) {
       // Propager l'erreur pour que le composant puisse l'afficher
       throw error;
@@ -173,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, studentLogin, agentLogin, adminLogin, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, studentLogin, unifiedLogin, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -9,7 +9,9 @@ import {
   Globe,
   School,
   Filter,
-  Eye
+  Eye,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 import { useAlerts } from '../../contexts/AlertContext';
 
@@ -325,10 +327,22 @@ export default function GlobalReportsSection() {
               <h4 className="font-semibold text-gray-800">Conformité et sécurité:</h4>
               <div className="bg-white rounded-xl p-4 border border-gray-200">
                 <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• ✅ Conformité RGPD respectée</li>
-                  <li>• ✅ Chiffrement des données actif</li>
-                  <li>• ✅ Audit de sécurité récent</li>
-                  <li>• ⚠️ Mise à jour des politiques recommandée</li>
+                  <li className="flex items-center">
+                    <CheckCircle className="w-3 h-3 mr-2 text-green-600" />
+                    Conformité RGPD respectée
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="w-3 h-3 mr-2 text-green-600" />
+                    Chiffrement des données actif
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="w-3 h-3 mr-2 text-green-600" />
+                    Audit de sécurité récent
+                  </li>
+                  <li className="flex items-center">
+                    <AlertCircle className="w-3 h-3 mr-2 text-orange-600" />
+                    Mise à jour des politiques recommandée
+                  </li>
                 </ul>
               </div>
             </div>

@@ -1,29 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Search, Filter, User, Phone, Mail, Calendar, GraduationCap, Edit, Trash2, Eye } from 'lucide-react';
+import { Users, Search, Filter, User, Phone, Calendar, GraduationCap, Eye } from 'lucide-react';
 import { studentService, Student } from '../../services/api';
-import AddStudentForm from './AddStudentForm';
 import StudentDetailsModal from './StudentDetailsModal';
-import EditStudentForm from './EditStudentForm';
 
-export default function StudentsSection() {
+interface StudentsSectionProps {
+  schoolId: string;
+}
+
+export default function StudentsSection({ schoolId }: StudentsSectionProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
   const [classes, setClasses] = useState<string[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showEditForm, setShowEditForm] = useState(false);
-
-  // Récupérer les données depuis le contexte d'authentification
-  const schoolCode = 'JMO75-01'; // TODO: Récupérer depuis le contexte
 
   useEffect(() => {
     loadStudents();
-  }, []);
+  }, [schoolId, searchTerm, selectedClass]);
 
   const loadStudents = async () => {
     try {
@@ -42,31 +38,6 @@ export default function StudentsSection() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadStudents();
-  }, [searchTerm, selectedClass]);
-
-  const handleStudentAdded = () => {
-    setShowAddForm(false);
-    loadStudents();
-  };
-
-  const handleDeleteStudent = async (studentId: string) => {
-    try {
-      // TODO: Implémenter la suppression côté API
-      console.log('Delete student:', studentId);
-      setShowDeleteConfirm(null);
-      loadStudents();
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Erreur lors de la suppression');
-    }
-  };
-
-  const handleEditStudent = (student: Student) => {
-    setSelectedStudent(student);
-    setShowEditForm(true);
   };
 
   const handleViewStudent = (student: Student) => {
@@ -91,33 +62,6 @@ export default function StudentsSection() {
     return age;
   };
 
-  if (showAddForm) {
-    return (
-      <AddStudentForm
-        onSuccess={handleStudentAdded}
-        onCancel={() => setShowAddForm(false)}
-        schoolCode={schoolCode}
-      />
-    );
-  }
-
-  if (showEditForm && selectedStudent) {
-    return (
-      <EditStudentForm
-        student={selectedStudent}
-        onSuccess={() => {
-          setShowEditForm(false);
-          setSelectedStudent(null);
-          loadStudents();
-        }}
-        onCancel={() => {
-          setShowEditForm(false);
-          setSelectedStudent(null);
-        }}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -125,18 +69,11 @@ export default function StudentsSection() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-800 flex items-center">
-              <Users className="w-6 h-6 mr-3 text-blue-600" />
-              Gestion des élèves
+              <Users className="w-6 h-6 mr-3 text-indigo-600" />
+              Liste des élèves
             </h1>
-            <p className="text-gray-600">Gérez les élèves de votre établissement</p>
+            <p className="text-gray-600">Consultez les élèves de votre établissement</p>
           </div>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="px-6 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-all duration-200 flex items-center"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Ajouter un élève
-          </button>
         </div>
 
         {/* Filtres */}
@@ -247,39 +184,27 @@ export default function StudentsSection() {
                         Téléphone
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Email
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         ID unique
                       </th>
                       <th className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
+                        Consultation
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {students.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-6 py-12 text-center">
+                        <td colSpan={8} className="px-6 py-12 text-center">
                           <div className="text-gray-400 mb-4">
                             <Users className="w-12 h-12 mx-auto" />
                           </div>
                           <h3 className="text-lg font-medium text-gray-800 mb-2">Aucun élève trouvé</h3>
-                          <p className="text-gray-600 mb-4">
+                          <p className="text-gray-600">
                             {searchTerm || selectedClass 
                               ? 'Aucun élève ne correspond à vos critères de recherche.'
-                              : 'Commencez par ajouter votre premier élève.'
+                              : 'Aucun élève enregistré pour le moment.'
                             }
                           </p>
-                          {!searchTerm && !selectedClass && (
-                            <button
-                              onClick={() => setShowAddForm(true)}
-                              className="px-6 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-all duration-200 flex items-center mx-auto"
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Ajouter un élève
-                            </button>
-                          )}
                         </td>
                       </tr>
                     ) : (
@@ -329,39 +254,18 @@ export default function StudentsSection() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {student.parentEmail || '-'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-mono">
                               {student.uniqueId}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <div className="flex items-center justify-center space-x-2">
-                              <button
-                                onClick={() => handleViewStudent(student)}
-                                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                                title="Voir les détails"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleEditStudent(student)}
-                                className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200"
-                                title="Modifier"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setShowDeleteConfirm(student.id)}
-                                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
-                                title="Supprimer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => handleViewStudent(student)}
+                              className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200"
+                              title="Voir les détails"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -373,42 +277,6 @@ export default function StudentsSection() {
           </div>
         )}
       </div>
-
-      {/* Modal de confirmation de suppression */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full mx-4 shadow-xl">
-            <div className="flex items-center mb-4">
-              <div className="bg-red-100 p-3 rounded-2xl mr-4">
-                <Trash2 className="w-6 h-6 text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800">Supprimer l'élève</h3>
-                <p className="text-sm text-gray-600">Cette action est irréversible</p>
-              </div>
-            </div>
-            
-            <p className="text-gray-700 mb-6">
-              Êtes-vous sûr de vouloir supprimer cet élève ? Toutes ses données seront définitivement supprimées.
-            </p>
-            
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowDeleteConfirm(null)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all duration-200"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => handleDeleteStudent(showDeleteConfirm)}
-                className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all duration-200"
-              >
-                Supprimer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal de détails de l'élève */}
       {showDetailsModal && selectedStudent && (
