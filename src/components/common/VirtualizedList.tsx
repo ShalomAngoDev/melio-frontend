@@ -58,8 +58,8 @@ export default function VirtualizedList<T>({
     }
   }, [isAtBottom, hasNextPage, loading, onLoadMore]);
 
-  const handleRowsRendered = ({ visibleRows }: { visibleRows: { startIndex: number; stopIndex: number } }) => {
-    const isNearBottom = visibleRows.stopIndex >= items.length - 10;
+  const handleRowsRendered = ({ visibleStartIndex, visibleStopIndex }: { visibleStartIndex: number; visibleStopIndex: number }) => {
+    const isNearBottom = visibleStopIndex >= items.length - 10;
     setIsAtBottom(isNearBottom);
   };
 
