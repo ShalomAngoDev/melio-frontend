@@ -18,10 +18,12 @@ import {
   Search,
   Trash2,
   Shield,
-  BarChart3
+  BarChart3,
+  GraduationCap
 } from 'lucide-react';
 import { adminService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import SchoolStudentsManagement from './SchoolStudentsManagement';
 
 interface SchoolDetailsProps {
   schoolId: string;
@@ -73,6 +75,7 @@ export default function SchoolDetails({ schoolId, onBack, onUpdate }: SchoolDeta
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showStudentsManagement, setShowStudentsManagement] = useState(false);
 
   // Données du formulaire
   const [formData, setFormData] = useState({
@@ -312,6 +315,26 @@ export default function SchoolDetails({ schoolId, onBack, onUpdate }: SchoolDeta
             </div>
           )}
         </div>
+      </div>
+
+      {/* Gestion des élèves */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-800 flex items-center">
+            <GraduationCap className="w-5 h-5 mr-2 text-blue-600" />
+            Élèves ({stats?.totalStudents || 0})
+          </h3>
+          <button
+            onClick={() => setShowStudentsManagement(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center"
+          >
+            <Users className="w-4 h-4 mr-2" />
+            Gérer les élèves
+          </button>
+        </div>
+        <p className="text-sm text-gray-600">
+          Gérez la liste des élèves de cette école, ajoutez-en de nouveaux ou importez depuis Excel.
+        </p>
       </div>
 
       {/* Statistiques de suivi détaillées */}
@@ -714,6 +737,7 @@ export default function SchoolDetails({ schoolId, onBack, onUpdate }: SchoolDeta
             </div>
           </div>
 
+
           {/* Agents attribués - EN DERNIER pour que le dropdown soit au-dessus */}
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 relative">
             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
@@ -818,6 +842,15 @@ export default function SchoolDetails({ schoolId, onBack, onUpdate }: SchoolDeta
           </div>
         </div>
       </div>
+
+      {/* Modal de gestion des élèves */}
+      {showStudentsManagement && school && (
+        <SchoolStudentsManagement
+          schoolId={school.id}
+          schoolName={school.name}
+          onBack={() => setShowStudentsManagement(false)}
+        />
+      )}
     </div>
   );
 }

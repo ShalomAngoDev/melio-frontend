@@ -15,6 +15,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { debugAuth, testApiRequest } from '../../utils/auth-debug';
 import { clearAuth, forceAdminLogin } from '../../utils/clear-auth';
+import SimpleVirtualizedList from '../common/SimpleVirtualizedList';
 
 interface School {
   id: string;
@@ -77,7 +78,7 @@ export default function GlobalStatisticsSection() {
       setError('Accès refusé - Admin requis');
       setIsLoading(false);
     }
-  }, [timeRange, selectedSchool, user]);
+  }, [timeRange, user]);
 
   // Fonction pour charger les statistiques des écoles
   const loadSchoolStats = async () => {
@@ -119,7 +120,7 @@ export default function GlobalStatisticsSection() {
     if (user?.role === 'admin' && schools.length > 0) {
       loadSchoolStats();
     }
-  }, [timeRange, selectedSchool]);
+  }, [timeRange]);
 
   const loadData = async () => {
     if (user?.role !== 'admin') {
@@ -165,8 +166,10 @@ export default function GlobalStatisticsSection() {
     }
   };
 
-  // Calculer les données pour les graphiques
-  const currentData = temporalStats?.alerts || [];
+  // Calculer les données pour les graphiques (filtrées)
+  const currentData = selectedSchool === 'all' 
+    ? (temporalStats?.alerts || [])
+    : []; // Pas de données temporelles au niveau école pour le moment
   const maxValue = currentData.length > 0 ? Math.max(...currentData.map(d => d.critical + d.high + d.medium + d.low)) : 1;
 
   const getBarHeight = (value: number) => (value / maxValue) * 100;
@@ -226,11 +229,12 @@ export default function GlobalStatisticsSection() {
 
 
   // Données de comparaison des écoles avec vraies statistiques
-  const schoolComparison = schools.map(school => {
+  const allSchoolComparison = schools.map(school => {
     const stats = schoolStats[school.id];
     return {
       name: school.name,
       code: school.code,
+      id: school.id,
       stats: stats ? {
         total: stats.totalAlerts || 0,
         critical: stats.alertsByRiskLevel?.CRITIQUE || 0,
@@ -266,14 +270,63 @@ export default function GlobalStatisticsSection() {
     };
   });
 
+  // Filtrer les écoles selon la sélection
+  const schoolComparison = selectedSchool === 'all' 
+    ? allSchoolComparison 
+    : allSchoolComparison.filter(school => school.id === selectedSchool);
+
+  // Calculer les statistiques filtrées selon l'école sélectionnée
+  const getFilteredStats = () => {
+    if (selectedSchool === 'all') {
+      // Utiliser les statistiques globales
+      return {
+        totalAlerts: globalStats?.totalAlerts || 0,
+        resolvedAlerts: globalStats?.resolvedAlerts || 0,
+        totalStudents: globalStats?.totalStudents || 0,
+        totalReports: globalStats?.totalReports || 0,
+        criticalAlerts: globalStats?.criticalAlerts || 0,
+        alertsByRiskLevel: globalStats?.alertsByRiskLevel || {},
+        reportsByUrgency: globalStats?.reportsByUrgency || {}
+      };
+    } else {
+      // Utiliser les statistiques de l'école sélectionnée
+      const school = allSchoolComparison.find(s => s.id === selectedSchool);
+      if (!school) return null;
+      
+      return {
+        totalAlerts: school.stats?.total || 0,
+        resolvedAlerts: school.stats?.resolved || 0,
+        totalStudents: school.students || 0,
+        totalReports: school.stats?.totalReports || 0,
+        criticalAlerts: school.stats?.byRiskLevel?.critical || 0,
+        alertsByRiskLevel: {
+          CRITIQUE: school.stats?.byRiskLevel?.critical || 0,
+          ELEVE: school.stats?.byRiskLevel?.high || 0,
+          MOYEN: school.stats?.byRiskLevel?.medium || 0,
+          FAIBLE: school.stats?.byRiskLevel?.low || 0
+        },
+        reportsByUrgency: {} // Pas disponible au niveau école
+      };
+    }
+  };
+
+  const filteredStats = getFilteredStats();
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-white/60 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white/20">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">Statistiques Globales</h1>
-            <p className="text-gray-600">Analyse des tendances pour toutes les écoles</p>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">
+              {selectedSchool === 'all' ? 'Statistiques Globales' : 'Statistiques de l\'École'}
+            </h1>
+            <p className="text-gray-600">
+              {selectedSchool === 'all' 
+                ? 'Analyse des tendances pour toutes les écoles'
+                : `Analyse des tendances pour ${schools.find(s => s.id === selectedSchool)?.name || 'l\'école sélectionnée'}`
+              }
+            </p>
           </div>
           
           <div className="flex space-x-4">
@@ -350,13 +403,13 @@ export default function GlobalStatisticsSection() {
               <Activity className="w-6 h-6 text-red-600" />
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-gray-800">{globalStats?.totalAlerts || 0}</div>
+              <div className="text-2xl font-bold text-gray-800">{filteredStats?.totalAlerts || 0}</div>
               <div className="text-sm text-gray-600">Total alertes</div>
             </div>
           </div>
           <div className="flex items-center text-sm">
             <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-            <span className="text-green-600">+{globalStats?.criticalAlerts || 0} critiques</span>
+            <span className="text-green-600">+{filteredStats?.criticalAlerts || 0} critiques</span>
           </div>
         </div>
 
@@ -366,13 +419,13 @@ export default function GlobalStatisticsSection() {
               <Activity className="w-6 h-6 text-green-600" />
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-gray-800">{globalStats?.resolvedAlerts || 0}</div>
+              <div className="text-2xl font-bold text-gray-800">{filteredStats?.resolvedAlerts || 0}</div>
               <div className="text-sm text-gray-600">Résolues</div>
             </div>
           </div>
           <div className="flex items-center text-sm">
             <span className="text-gray-600">
-              {globalStats?.totalAlerts ? Math.round((globalStats.resolvedAlerts / globalStats.totalAlerts) * 100) : 0}% du total
+              {filteredStats?.totalAlerts ? Math.round((filteredStats.resolvedAlerts / filteredStats.totalAlerts) * 100) : 0}% du total
             </span>
           </div>
         </div>
@@ -383,12 +436,17 @@ export default function GlobalStatisticsSection() {
               <Users className="w-6 h-6 text-orange-600" />
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-gray-800">{globalStats?.totalStudents || 0}</div>
+              <div className="text-2xl font-bold text-gray-800">{filteredStats?.totalStudents || 0}</div>
               <div className="text-sm text-gray-600">Élèves</div>
             </div>
           </div>
           <div className="flex items-center text-sm">
-            <span className="text-gray-600">Dans {globalStats?.totalSchools || 0} écoles</span>
+            <span className="text-gray-600">
+              {selectedSchool === 'all' 
+                ? `Dans ${globalStats?.totalSchools || 0} écoles`
+                : 'École sélectionnée'
+              }
+            </span>
           </div>
         </div>
 
@@ -398,12 +456,17 @@ export default function GlobalStatisticsSection() {
               <Calendar className="w-6 h-6 text-purple-600" />
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-gray-800">{globalStats?.totalReports || 0}</div>
+              <div className="text-2xl font-bold text-gray-800">{filteredStats?.totalReports || 0}</div>
               <div className="text-sm text-gray-600">Signalements</div>
             </div>
           </div>
           <div className="flex items-center text-sm">
-            <span className="text-gray-600">{globalStats?.newReports || 0} nouveaux</span>
+            <span className="text-gray-600">
+              {selectedSchool === 'all' 
+                ? `${globalStats?.newReports || 0} nouveaux`
+                : 'Pour cette école'
+              }
+            </span>
           </div>
         </div>
       </div>
@@ -495,12 +558,12 @@ export default function GlobalStatisticsSection() {
           
           <div className="space-y-4">
             {[
-              { level: 'critical', label: 'Critique', count: globalStats?.alertsByRiskLevel?.CRITIQUE || 0, color: 'bg-red-500' },
-              { level: 'high', label: 'Élevé', count: globalStats?.alertsByRiskLevel?.ELEVE || 0, color: 'bg-orange-500' },
-              { level: 'medium', label: 'Moyen', count: globalStats?.alertsByRiskLevel?.MOYEN || 0, color: 'bg-yellow-500' },
-              { level: 'low', label: 'Faible', count: globalStats?.alertsByRiskLevel?.FAIBLE || 0, color: 'bg-blue-500' }
+              { level: 'critical', label: 'Critique', count: filteredStats?.alertsByRiskLevel?.CRITIQUE || 0, color: 'bg-red-500' },
+              { level: 'high', label: 'Élevé', count: filteredStats?.alertsByRiskLevel?.ELEVE || 0, color: 'bg-orange-500' },
+              { level: 'medium', label: 'Moyen', count: filteredStats?.alertsByRiskLevel?.MOYEN || 0, color: 'bg-yellow-500' },
+              { level: 'low', label: 'Faible', count: filteredStats?.alertsByRiskLevel?.FAIBLE || 0, color: 'bg-blue-500' }
             ].map((item) => {
-              const total = globalStats?.totalAlerts || 0;
+              const total = filteredStats?.totalAlerts || 0;
               const percentage = total > 0 ? (item.count / total) * 100 : 0;
               return (
                 <div key={item.level}>
@@ -533,9 +596,17 @@ export default function GlobalStatisticsSection() {
       {/* School Comparison */}
       <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white/20">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-800">
-          Comparaison des écoles
-        </h3>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">
+              Comparaison des écoles
+            </h3>
+            <p className="text-sm text-gray-600">
+              {selectedSchool === 'all' 
+                ? `${schoolComparison.length} école(s) affichée(s)`
+                : `1 école sélectionnée`
+              }
+            </p>
+          </div>
           {loadingSchoolStats && (
             <div className="flex items-center text-sm text-gray-600">
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -544,70 +615,137 @@ export default function GlobalStatisticsSection() {
           )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {schoolComparison.map((school) => (
-            <div key={school.code} className="bg-gray-50 rounded-2xl p-6">
-              <div className="flex items-center mb-4">
-                <School className="w-6 h-6 text-blue-600 mr-3" />
-                <div>
-                  <h4 className="font-semibold text-gray-800">{school.name}</h4>
-                  <p className="text-sm text-gray-600">{school.region}</p>
+        {schoolComparison.length === 0 ? (
+          <div className="text-center py-12">
+            <School className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-500 mb-2">Aucune école disponible</h3>
+            <p className="text-gray-400">Aucune donnée de comparaison pour le moment.</p>
+          </div>
+        ) : (
+          <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden">
+            {/* Header des colonnes */}
+            <div className="bg-gray-100 border-b-2 border-gray-300 p-4">
+              <div className="flex items-center w-full justify-between">
+                <div className="w-48 px-2">
+                  <span className="text-sm text-gray-600">École</span>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="text-center">
-                  <div className="text-xl font-bold text-gray-800">{school.students}</div>
-                  <div className="text-xs text-gray-600">Élèves</div>
+                <div className="w-24 text-center px-2">
+                  <span className="text-sm text-gray-600">Élèves</span>
                 </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-gray-800">{school.staff}</div>
-                  <div className="text-xs text-gray-600">Agents</div>
+                <div className="w-24 text-center px-2">
+                  <span className="text-sm text-gray-600">Agents</span>
                 </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-gray-800">{school.stats?.total || 0}</div>
-                  <div className="text-xs text-gray-600">Alertes</div>
+                <div className="w-24 text-center px-2">
+                  <span className="text-sm text-gray-600">Alertes</span>
                 </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-green-600">{school.stats?.resolved || 0}</div>
-                  <div className="text-xs text-gray-600">Résolues</div>
+                <div className="w-24 text-center px-2">
+                  <span className="text-sm text-gray-600">Résolues</span>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Critiques:</span>
-                  <span className="font-medium text-red-600">{school.stats?.byRiskLevel?.critical || 0}</span>
+                <div className="w-32 text-center px-2">
+                  <span className="text-sm text-gray-600">Taux résolution</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Élevées:</span>
-                  <span className="font-medium text-orange-600">{school.stats?.byRiskLevel?.high || 0}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Moyennes:</span>
-                  <span className="font-medium text-yellow-600">{school.stats?.byRiskLevel?.medium || 0}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Faibles:</span>
-                  <span className="font-medium text-blue-600">{school.stats?.byRiskLevel?.low || 0}</span>
-                </div>
-                <div className="border-t pt-2 mt-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Signalements:</span>
-                    <span className="font-medium text-purple-600">{school.stats?.totalReports || 0}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 p-3 bg-blue-50 rounded-xl">
-                <div className="text-sm font-medium text-blue-800 mb-1">Taux de résolution</div>
-                <div className="text-lg font-bold text-blue-600">
-                  {(school.stats?.total || 0) > 0 ? Math.round(((school.stats?.resolved || 0) / (school.stats?.total || 1)) * 100) : 0}%
+                <div className="w-24 text-center px-2">
+                  <span className="text-sm text-gray-600">Signalements</span>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+
+            <SimpleVirtualizedList<typeof schoolComparison[0]>
+              items={schoolComparison}
+              height={400}
+              itemHeight={120}
+              renderItem={({ item: school }) => (
+                <div
+                  key={school.code}
+                  className="hover:bg-blue-50/50 transition-colors border-b border-gray-200 p-4 h-30"
+                >
+                  {/* Ligne principale avec les métriques */}
+                  <div className="flex items-center w-full justify-between mb-3">
+                    {/* École - Largeur fixe */}
+                    <div className="flex items-center w-48 px-2">
+                      <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                        <School className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate" title={school.name}>
+                          {school.name}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {school.code} • {school.region}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Élèves - Largeur fixe */}
+                    <div className="w-24 text-center px-2">
+                      <div className="text-lg font-bold text-gray-800">{school.students}</div>
+                      <div className="text-xs text-gray-500">Élèves</div>
+                    </div>
+
+                    {/* Agents - Largeur fixe */}
+                    <div className="w-24 text-center px-2">
+                      <div className="text-lg font-bold text-gray-800">{school.staff}</div>
+                      <div className="text-xs text-gray-500">Agents</div>
+                    </div>
+
+                    {/* Alertes - Largeur fixe */}
+                    <div className="w-24 text-center px-2">
+                      <div className="text-lg font-bold text-gray-800">{school.stats?.total || 0}</div>
+                      <div className="text-xs text-gray-500">Alertes</div>
+                    </div>
+
+                    {/* Résolues - Largeur fixe */}
+                    <div className="w-24 text-center px-2">
+                      <div className="text-lg font-bold text-green-600">{school.stats?.resolved || 0}</div>
+                      <div className="text-xs text-gray-500">Résolues</div>
+                    </div>
+
+                    {/* Taux de résolution - Largeur fixe */}
+                    <div className="w-32 text-center px-2">
+                      <div className="text-lg font-bold text-blue-600">
+                        {(school.stats?.total || 0) > 0 ? Math.round(((school.stats?.resolved || 0) / (school.stats?.total || 1)) * 100) : 0}%
+                      </div>
+                      <div className="text-xs text-gray-500">Taux</div>
+                    </div>
+
+                    {/* Signalements - Largeur fixe */}
+                    <div className="w-24 text-center px-2">
+                      <div className="text-lg font-bold text-purple-600">{school.stats?.totalReports || 0}</div>
+                      <div className="text-xs text-gray-500">Signalements</div>
+                    </div>
+                  </div>
+
+                  {/* Détails des niveaux de risque - Ligne supplémentaire alignée */}
+                  <div className="w-full">
+                    <div className="flex justify-between text-xs text-gray-600 px-2">
+                      <div className="w-48 px-2">
+                        <span className="text-gray-400">Détails des risques:</span>
+                      </div>
+                      <div className="w-24 text-center px-2">
+                        <span className="text-gray-400">-</span>
+                      </div>
+                      <div className="w-24 text-center px-2">
+                        <span className="text-gray-400">-</span>
+                      </div>
+                      <div className="w-24 text-center px-2">
+                        <span>Critiques: <span className="font-medium text-red-600">{school.stats?.byRiskLevel?.critical || 0}</span></span>
+                      </div>
+                      <div className="w-24 text-center px-2">
+                        <span>Élevées: <span className="font-medium text-orange-600">{school.stats?.byRiskLevel?.high || 0}</span></span>
+                      </div>
+                      <div className="w-32 text-center px-2">
+                        <span>Moyennes: <span className="font-medium text-yellow-600">{school.stats?.byRiskLevel?.medium || 0}</span></span>
+                      </div>
+                      <div className="w-24 text-center px-2">
+                        <span>Faibles: <span className="font-medium text-blue-600">{school.stats?.byRiskLevel?.low || 0}</span></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            />
+          </div>
+        )}
       </div>
 
       {/* Trends Analysis */}

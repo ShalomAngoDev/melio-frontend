@@ -147,6 +147,7 @@ export default function UnifiedLoginScreen() {
                       className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
                       placeholder="votre.email@example.com"
                       disabled={isLoading}
+                      autoComplete="email"
                       required
                     />
                   </div>
@@ -164,6 +165,7 @@ export default function UnifiedLoginScreen() {
                         className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
                         placeholder="Votre mot de passe"
                         disabled={isLoading}
+                        autoComplete="current-password"
                         required
                       />
                       <button
@@ -240,4 +242,5 @@ export default function UnifiedLoginScreen() {
     </div>
   );
 }
+
 

@@ -854,6 +854,55 @@ export const adminService = {
     const response = await api.delete(`/admin/agents/${agentId}`);
     return response.data;
   },
+
+  // ===== GESTION DES ÉLÈVES PAR L'ADMIN =====
+  // Lister les élèves d'une école
+  getSchoolStudents: async (schoolId: string, filters?: { search?: string; className?: string }) => {
+    const response = await api.get(`/admin/schools/${schoolId}/students`, { params: filters });
+    return response.data;
+  },
+
+  // Créer un élève dans une école
+  createSchoolStudent: async (schoolId: string, studentData: {
+    firstName: string;
+    lastName: string;
+    birthdate: string;
+    sex: 'M' | 'F';
+    className: string;
+    parentName?: string;
+    parentPhone?: string;
+    parentEmail?: string;
+  }) => {
+    const response = await api.post(`/admin/schools/${schoolId}/students`, studentData);
+    return response.data;
+  },
+
+  // Modifier un élève d'une école
+  updateSchoolStudent: async (schoolId: string, studentId: string, updateData: {
+    firstName?: string;
+    lastName?: string;
+    birthdate?: string;
+    sex?: 'M' | 'F';
+    className?: string;
+    parentName?: string;
+    parentPhone?: string;
+    parentEmail?: string;
+  }) => {
+    const response = await api.put(`/admin/schools/${schoolId}/students/${studentId}`, updateData);
+    return response.data;
+  },
+
+  // Supprimer un élève d'une école
+  deleteSchoolStudent: async (schoolId: string, studentId: string) => {
+    const response = await api.delete(`/admin/schools/${schoolId}/students/${studentId}`);
+    return response.data;
+  },
+
+  // Importer des élèves depuis Excel
+  importSchoolStudents: async (schoolId: string, students: any[]) => {
+    const response = await api.post(`/admin/schools/${schoolId}/students/import`, { students });
+    return response.data;
+  },
 };
 
 export default api;

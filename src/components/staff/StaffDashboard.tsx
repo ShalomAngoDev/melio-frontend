@@ -304,7 +304,19 @@ export default function StaffDashboard() {
               {activeSection === 'statistics' && <StatisticsSection schoolId={selectedSchoolId} />}
               {activeSection === 'reports' && <ReportsSection onReportsViewed={handleReportsViewed} schoolId={selectedSchoolId} />}
               {activeSection === 'school-reports' && <SchoolReportsSection schoolId={selectedSchoolId} />}
-              {activeSection === 'students' && <StudentsSection schoolId={selectedSchoolId} />}
+              {activeSection === 'students' && (
+                <StudentsSection 
+                  schoolId={selectedSchoolId} 
+                  schoolName={user?.schools && user.schools.length > 1
+                    ? user.schools.find(s => s.id === selectedSchoolId)?.name || user.schoolName
+                    : user?.schoolName
+                  }
+                  schoolCode={user?.schools && user.schools.length > 1
+                    ? user.schools.find(s => s.id === selectedSchoolId)?.code || user.schoolCode
+                    : user?.schoolCode
+                  }
+                />
+              )}
               {activeSection === 'school-info' && <SchoolInfoSection schoolId={selectedSchoolId} />}
             </>
           )}

@@ -4,11 +4,14 @@ import {
   Shield,
   Eye,
   AlertCircle,
-  TrendingUp,
-  Calendar
+  Brain,
+  Calendar,
+  MessageCircle,
+  BookOpen
 } from 'lucide-react';
 import { alertService, Alert, AlertStats } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import SimpleVirtualizedList from '../common/SimpleVirtualizedList';
 
 interface AlertsSectionProps {
   onAlertsViewed?: () => void;
@@ -19,15 +22,13 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
   const { showSuccess, showError, showWarning } = useToast();
   const [allAlerts, setAllAlerts] = useState<Alert[]>([]);
   const [filteredAlerts, setFilteredAlerts] = useState<Alert[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [stats, setStats] = useState<AlertStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('NOUVELLE');
   const [selectedRiskLevel, setSelectedRiskLevel] = useState<string>('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(15);
   const [showCommentModal, setShowCommentModal] = useState(false);
+
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<string>('');
   const [comment, setComment] = useState('');
@@ -48,15 +49,14 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
     applyFilter();
   }, [selectedStatus, selectedRiskLevel, allAlerts]);
 
-  useEffect(() => {
-    applyPagination();
-  }, [currentPage, filteredAlerts]);
-
   // Filtrage local INSTANTANÉ
   const applyFilter = () => {
-    if (!allAlerts.length) return;
+    if (!allAlerts.length) {
+      setFilteredAlerts([]);
+      return;
+    }
     
-    let filtered = allAlerts;
+    let filtered = [...allAlerts];
     
     // Filtrer par statut
     if (selectedStatus) {
@@ -68,31 +68,8 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
       filtered = filtered.filter(alert => alert.riskLevel === selectedRiskLevel);
     }
     
-    // Éviter les re-renders inutiles
-    setFilteredAlerts(prev => {
-      if (JSON.stringify(prev) === JSON.stringify(filtered)) {
-        return prev;
-      }
-      return filtered;
-    });
-    setCurrentPage(1); // Reset to first page when filtering
-  };
-
-  // Pagination locale INSTANTANÉE
-  const applyPagination = () => {
-    if (!filteredAlerts.length) return;
+    setFilteredAlerts(filtered);
     
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedAlerts = filteredAlerts.slice(startIndex, endIndex);
-    
-    // Éviter les re-renders inutiles
-    setAlerts(prev => {
-      if (JSON.stringify(prev) === JSON.stringify(paginatedAlerts)) {
-        return prev;
-      }
-      return paginatedAlerts;
-    });
   };
 
   const loadAlerts = async (isInitialLoad = true) => {
@@ -121,6 +98,7 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
     }
   };
 
+
   const refreshAlerts = async () => {
     console.log('Refreshing alerts...');
     setIsLoading(true);
@@ -129,8 +107,6 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
     try {
       // Vider le cache local
       setAllAlerts([]);
-      setFilteredAlerts([]);
-      setAlerts([]);
       
       // Recharger les alertes
       await loadAlerts(false);
@@ -288,6 +264,33 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
     }
   };
 
+  // Fonction pour obtenir l'icône et le texte selon le type de source
+  const getSourceInfo = (sourceType: string) => {
+    switch (sourceType) {
+      case 'CHAT':
+        return {
+          icon: MessageCircle,
+          text: 'Conversation',
+          color: 'text-blue-600 bg-blue-100',
+          description: 'Détecté dans une conversation avec Mélio'
+        };
+      case 'JOURNAL':
+        return {
+          icon: BookOpen,
+          text: 'Journal',
+          color: 'text-purple-600 bg-purple-100',
+          description: 'Détecté dans le journal intime'
+        };
+      default:
+        return {
+          icon: AlertCircle,
+          text: 'Autre',
+          color: 'text-gray-600 bg-gray-100',
+          description: 'Source inconnue'
+        };
+    }
+  };
+
 
   // Fonction pour obtenir les couleurs de carte selon le statut
   const getCardColors = (status: string) => {
@@ -378,15 +381,15 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            {alerts.length} alerte(s) affichée(s)
+            {allAlerts.length} alerte(s) affichée(s)
           </div>
-          <button
-            onClick={refreshAlerts}
+            <button
+              onClick={refreshAlerts}
             className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
             title="Actualiser"
           >
             <RefreshCw className="w-4 h-4" />
-          </button>
+            </button>
         </div>
       </div>
 
@@ -438,8 +441,8 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
             >
               Traitées • {stats?.traitees || 0}
             </button>
+            </div>
           </div>
-        </div>
 
         {/* Filtre par niveau de risque */}
         <div className="pt-3 border-t border-gray-200">
@@ -499,138 +502,140 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
 
 
       {/* Liste des alertes - Vue Table Compacte */}
-      {alerts.length === 0 && !isLoading ? (
+      {filteredAlerts.length === 0 && !isLoading ? (
         <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-12 text-center shadow-lg border border-white/20">
           <Shield className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <h3 className="text-lg font-medium text-gray-700 mb-1">Aucune alerte</h3>
-          <p className="text-sm text-gray-500">Aucune alerte de sécurité détectée pour le moment.</p>
-        </div>
-      ) : (
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Élève</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Risque</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Résumé IA</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Statut</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Date</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {alerts.map((alert) => (
-                  <tr 
-                    key={alert.id}
-                    onClick={() => handleOpenDetailModal(alert)}
-                    className="hover:bg-indigo-50/50 transition-colors cursor-pointer"
-                  >
-                    {/* Élève */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                          {alert.student.firstName[0]}{alert.student.lastName[0]}
-                        </div>
-                        <div>
-                          <div className="font-medium text-sm text-gray-800">
-                            {alert.student.firstName} {alert.student.lastName}
-                          </div>
-                          <div className="text-xs text-gray-500">{alert.student.className}</div>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Risque */}
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${getRiskLevelColor(alert.riskLevel)}`}>
-                        {alert.riskLevel}
-                      </span>
-                    </td>
-
-                    {/* Résumé */}
-                    <td className="px-4 py-3 max-w-md">
-                      <p className="text-sm text-gray-700 line-clamp-2">{alert.aiSummary}</p>
-                    </td>
-
-                    {/* Statut */}
-                    <td className="px-4 py-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        alert.status === 'NOUVELLE' ? 'bg-red-100 text-red-700' :
-                        alert.status === 'EN_COURS' ? 'bg-orange-100 text-orange-700' :
-                        'bg-green-100 text-green-700'
-                      }`}>
-                        {getStatusText(alert.status)}
-                      </span>
-                    </td>
-
-                    {/* Date */}
-                    <td className="px-4 py-3 text-xs text-gray-600">
-                      {new Date(alert.createdAt).toLocaleDateString('fr-FR')}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-3 text-right">
-                      {alert.status === 'NOUVELLE' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStatusChange(alert.id, 'EN_COURS');
-                          }}
-                          className="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-all"
-                        >
-                          Prendre
-                        </button>
-                      )}
-                      {alert.status === 'EN_COURS' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStatusChange(alert.id, 'TRAITEE');
-                          }}
-                          className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-medium transition-all"
-                        >
-                          Traiter
-                        </button>
-                      )}
-                      {alert.status === 'TRAITEE' && (
-                        <Eye className="w-4 h-4 text-gray-400 ml-auto" />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <p className="text-sm text-gray-500">Aucune alerte de sécurité détectée pour le moment.</p>
           </div>
-        </div>
-      )}
-
-      {/* Pagination simple */}
-      {filteredAlerts.length > itemsPerPage && (
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-3 shadow-lg border border-white/20">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">
-              Page {currentPage} / {Math.ceil(filteredAlerts.length / itemsPerPage)}
-            </span>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-1.5 bg-gray-100 hover:bg-indigo-100 text-gray-700 hover:text-indigo-700 rounded-lg disabled:opacity-50 transition-all"
-              >
-                Précédent
-              </button>
-              <button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage >= Math.ceil(filteredAlerts.length / itemsPerPage)}
-                className="px-4 py-1.5 bg-gray-100 hover:bg-indigo-100 text-gray-700 hover:text-indigo-700 rounded-lg disabled:opacity-50 transition-all"
-              >
-                Suivant
-              </button>
+        ) : (
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden">
+          {/* Header des colonnes */}
+          <div className="bg-gray-100 border-b-2 border-gray-300 p-4">
+            <div className="flex items-center w-full justify-between">
+              <div className="w-48 px-2">
+                <span className="text-sm text-gray-600">Élève</span>
+              </div>
+              <div className="w-24 text-center px-2">
+                <span className="text-sm text-gray-600">Source</span>
+              </div>
+              <div className="w-24 text-center px-2">
+                <span className="text-sm text-gray-600">Risque</span>
+              </div>
+              <div className="flex-1 mx-4 px-2">
+                <span className="text-sm text-gray-600">Résumé</span>
+              </div>
+              <div className="w-24 text-center px-2">
+                <span className="text-sm text-gray-600">Statut</span>
+              </div>
+              <div className="w-20 text-center px-2">
+                <span className="text-sm text-gray-600">Date</span>
+              </div>
+              <div className="w-24 text-center px-2">
+                <span className="text-sm text-gray-600">Actions</span>
+              </div>
             </div>
           </div>
+
+          <SimpleVirtualizedList<Alert>
+          items={filteredAlerts}
+          height={600}
+          itemHeight={80}
+          renderItem={({ item: alert }) => {
+            const sourceInfo = getSourceInfo(alert.sourceType);
+            const SourceIcon = sourceInfo.icon;
+            
+            return (
+              <div
+                key={alert.id}
+                onClick={() => handleOpenDetailModal(alert)}
+                className="hover:bg-indigo-50/50 transition-colors cursor-pointer border-b border-gray-200 p-4 h-20 flex items-center"
+              >
+                <div className="flex items-center w-full">
+                  {/* Élève - Largeur fixe */}
+                  <div className="flex items-center space-x-3 w-48">
+                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                      {alert.student.firstName[0]}{alert.student.lastName[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-gray-800 truncate">
+                          {alert.student.firstName} {alert.student.lastName}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">{alert.student.className}</div>
+                    </div>
+                  </div>
+
+                  {/* Source - Largeur fixe */}
+                  <div className="w-24 flex justify-center">
+                    <div className="flex items-center justify-center">
+                      <SourceIcon className="w-5 h-5 text-gray-600" />
+                    </div>
+                  </div>
+
+                  {/* Risque - Largeur fixe */}
+                  <div className="w-24 flex justify-center">
+                    <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${getRiskLevelColor(alert.riskLevel)}`}>
+                      {alert.riskLevel}
+                    </span>
+                  </div>
+
+                  {/* Résumé - Largeur fixe */}
+                  <div className="flex-1 mx-4 min-w-0">
+                    <p className="text-sm text-gray-700 line-clamp-2 truncate">{alert.aiSummary}</p>
+                  </div>
+
+                  {/* Statut - Largeur fixe */}
+                  <div className="w-24 flex justify-center">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      alert.status === 'NOUVELLE' ? 'bg-red-100 text-red-700' :
+                      alert.status === 'EN_COURS' ? 'bg-orange-100 text-orange-700' :
+                      'bg-green-100 text-green-700'
+                    }`}>
+                        {getStatusText(alert.status)}
+                      </span>
+                  </div>
+
+                  {/* Date - Largeur fixe */}
+                  <div className="w-20 text-xs text-gray-600 text-center">
+                    {new Date(alert.createdAt).toLocaleDateString('fr-FR')}
+                  </div>
+
+                  {/* Actions - Largeur fixe */}
+                  <div className="w-24 flex justify-center">
+                    {alert.status === 'NOUVELLE' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStatusChange(alert.id, 'EN_COURS');
+                        }}
+                      className="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-all"
+                      >
+                      Prendre
+                      </button>
+                    )}
+                    {alert.status === 'EN_COURS' && (
+                        <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStatusChange(alert.id, 'TRAITEE');
+                        }}
+                      className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-medium transition-all"
+                        >
+                      Traiter
+                        </button>
+                      )}
+                  {alert.status === 'TRAITEE' && (
+                    <Eye className="w-4 h-4 text-gray-400" />
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+          }}
+        />
         </div>
       )}
+
 
       {/* Modal de commentaire */}
       {showCommentModal && (
@@ -735,10 +740,34 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
             {/* Contenu scrollable */}
             <div className="overflow-y-auto max-h-[calc(90vh-250px)] p-6">
               <div className="space-y-6">
+                {/* Source de l'alerte */}
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-5 border-2 border-purple-200">
+                  <h3 className="text-lg font-bold text-purple-900 mb-3 flex items-center">
+                    {(() => {
+                      const sourceInfo = getSourceInfo(selectedAlert.sourceType);
+                      const SourceIcon = sourceInfo.icon;
+                      return (
+                        <>
+                          <SourceIcon className="w-5 h-5 mr-2" />
+                          Source de l'alerte
+                        </>
+                      );
+                    })()}
+                  </h3>
+                  <div className="flex items-center space-x-3">
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getSourceInfo(selectedAlert.sourceType).color}`}>
+                      {getSourceInfo(selectedAlert.sourceType).text}
+                    </span>
+                    <span className="text-purple-700 text-sm">
+                      {getSourceInfo(selectedAlert.sourceType).description}
+                    </span>
+                  </div>
+                </div>
+
                 {/* Analyse IA */}
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border-2 border-blue-200">
                   <h3 className="text-lg font-bold text-blue-900 mb-3 flex items-center">
-                    <TrendingUp className="w-5 h-5 mr-2" />
+                    <Brain className="w-5 h-5 mr-2" />
                     Analyse IA
                   </h3>
                   <p className="text-blue-800 leading-relaxed">{selectedAlert.aiSummary}</p>
@@ -754,20 +783,20 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                 </div>
 
                 {/* Informations élève */}
-                <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-800 mb-3">Informations élève</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-600">Nom complet :</span>
-                      <span className="text-gray-800">{selectedAlert.student.firstName} {selectedAlert.student.lastName}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-600">Classe :</span>
-                      <span className="text-gray-800">{selectedAlert.student.className}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-600">Humeur :</span>
-                      <span className="text-gray-800">{selectedAlert.childMood}</span>
+                  <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
+                    <h3 className="text-lg font-bold text-gray-800 mb-3">Informations élève</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-600">Nom complet :</span>
+                        <span className="text-gray-800">{selectedAlert.student.firstName} {selectedAlert.student.lastName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-600">Classe :</span>
+                        <span className="text-gray-800">{selectedAlert.student.className}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium text-gray-600">Humeur :</span>
+                        <span className="text-gray-800">{selectedAlert.childMood}</span>
                     </div>
                   </div>
                 </div>

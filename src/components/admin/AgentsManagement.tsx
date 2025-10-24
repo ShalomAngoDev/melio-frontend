@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { adminService, schoolService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import SimpleVirtualizedList from '../common/SimpleVirtualizedList';
 
 interface Agent {
   id: string;
@@ -546,82 +547,106 @@ export default function AgentsManagement() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredAgents.map((agent) => (
-            <div
-              key={agent.id}
-              className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 shadow-lg border border-white/20 hover:shadow-xl transition-all"
-            >
-              {/* Header de la carte */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                    {agent.firstName?.[0] || agent.email[0].toUpperCase()}
-                    {agent.lastName?.[0] || ''}
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="font-semibold text-gray-800">
-                      {agent.firstName && agent.lastName 
-                        ? `${agent.firstName} ${agent.lastName}`
-                        : agent.email
-                      }
-                    </h3>
-                    <div className="flex items-center text-xs text-gray-500">
-                      <Shield className="w-3 h-3 mr-1" />
-                      Agent Social
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex space-x-1">
-                  <button
-                    onClick={() => setEditingAgent(agent)}
-                    className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
-                    title="Modifier"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteAgent(agent.id)}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                    title="Supprimer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden">
+          {/* Header des colonnes */}
+          <div className="bg-gray-100 border-b-2 border-gray-300 p-4">
+            <div className="flex items-center w-full justify-between">
+              <div className="w-48 px-2">
+                <span className="text-sm text-gray-600">Agent</span>
               </div>
-
-              {/* Email */}
-              <div className="flex items-center text-sm text-gray-600 mb-3 bg-gray-50 rounded-lg p-2">
-                <Mail className="w-4 h-4 mr-2 text-purple-500" />
-                <span className="font-mono text-xs">{agent.email}</span>
+              <div className="w-64 px-2">
+                <span className="text-sm text-gray-600">Email</span>
               </div>
-
-              {/* Écoles */}
-              <div className="border-t pt-3">
-                <div className="flex items-center text-xs font-medium text-gray-700 mb-2">
-                  <School className="w-4 h-4 mr-1 text-purple-600" />
-                  Écoles ({agent.schools?.length || 0})
-                </div>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {agent.schools?.map((school) => (
-                    <div
-                      key={school.id}
-                      className="flex items-center justify-between text-xs bg-purple-50 rounded-lg px-3 py-2"
-                    >
-                      <span className="font-medium text-purple-800">{school.name}</span>
-                      <span className="text-purple-600">{school.code}</span>
-                    </div>
-                  ))}
-                </div>
+              <div className="w-48 px-2">
+                <span className="text-sm text-gray-600">Écoles</span>
               </div>
-
-              {/* Date de création */}
-              <div className="mt-3 pt-3 border-t text-xs text-gray-500">
-                Créé le {new Date(agent.createdAt).toLocaleDateString('fr-FR')}
+              <div className="w-24 px-2">
+                <span className="text-sm text-gray-600">Créé le</span>
+              </div>
+              <div className="w-28 text-center px-2">
+                <span className="text-sm text-gray-600">Actions</span>
               </div>
             </div>
-          ))}
+          </div>
+
+          <SimpleVirtualizedList<Agent>
+            items={filteredAgents}
+            height={600}
+            itemHeight={80}
+            renderItem={({ item: agent }) => (
+              <div
+                key={agent.id}
+                className="hover:bg-purple-50/50 transition-colors border-b border-gray-200 p-4 h-20 flex items-center"
+              >
+                <div className="flex items-center w-full justify-between">
+                  {/* Agent - Largeur fixe */}
+                  <div className="flex items-center w-48 px-2">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">
+                      {agent.firstName?.[0] || agent.email[0].toUpperCase()}
+                      {agent.lastName?.[0] || ''}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {agent.firstName && agent.lastName 
+                          ? `${agent.firstName} ${agent.lastName}`
+                          : agent.email
+                        }
+                      </div>
+                      <div className="flex items-center text-xs text-gray-500">
+                        <Shield className="w-3 h-3 mr-1" />
+                        Agent Social
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Email - Largeur fixe */}
+                  <div className="w-64 px-2">
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Mail className="w-4 h-4 mr-2 text-purple-500" />
+                      <span className="font-mono text-xs truncate">{agent.email}</span>
+                    </div>
+                  </div>
+
+                  {/* Écoles - Largeur fixe */}
+                  <div className="w-48 px-2">
+                    <div className="flex items-center text-xs text-gray-600">
+                      <School className="w-4 h-4 mr-1 text-purple-600" />
+                      {agent.schools?.length || 0} école(s)
+                    </div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {agent.schools?.slice(0, 2).map(s => s.name).join(', ')}
+                      {agent.schools && agent.schools.length > 2 && '...'}
+                    </div>
+                  </div>
+
+                  {/* Date de création - Largeur fixe */}
+                  <div className="w-24 px-2">
+                    <div className="text-xs text-gray-500">
+                      {new Date(agent.createdAt).toLocaleDateString('fr-FR')}
+                    </div>
+                  </div>
+
+                  {/* Actions - Largeur fixe */}
+                  <div className="w-28 flex justify-center space-x-1 px-2">
+                    <button
+                      onClick={() => setEditingAgent(agent)}
+                      className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                      title="Modifier"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAgent(agent.id)}
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          />
         </div>
       )}
     </div>
