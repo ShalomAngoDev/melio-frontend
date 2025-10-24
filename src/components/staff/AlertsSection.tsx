@@ -1,36 +1,34 @@
 import { useState, useEffect } from 'react';
 import { 
-  AlertTriangle, 
-  Filter, 
   RefreshCw,
-  Calendar,
-  TrendingUp,
   Shield,
-  AlertCircle
+  Eye,
+  AlertCircle,
+  Brain,
+  Calendar,
+  MessageCircle,
+  BookOpen
 } from 'lucide-react';
 import { alertService, Alert, AlertStats } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import SimpleVirtualizedList from '../common/SimpleVirtualizedList';
 
 interface AlertsSectionProps {
   onAlertsViewed?: () => void;
+  schoolId: string;
 }
 
-export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
+export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectionProps) {
   const { showSuccess, showError, showWarning } = useToast();
   const [allAlerts, setAllAlerts] = useState<Alert[]>([]);
   const [filteredAlerts, setFilteredAlerts] = useState<Alert[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [stats, setStats] = useState<AlertStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('NOUVELLE');
-  const [showFilters, setShowFilters] = useState(() => {
-    const saved = localStorage.getItem('alerts-showFilters');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(22);
+  const [selectedRiskLevel, setSelectedRiskLevel] = useState<string>('');
   const [showCommentModal, setShowCommentModal] = useState(false);
+
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<string>('');
   const [comment, setComment] = useState('');
@@ -44,57 +42,34 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
       await Promise.all([loadAlerts(), loadStats()]);
     };
     initializeData();
-  }, []); // Only load on component mount
-
-  // Sauvegarder l'état des filtres dans localStorage
-  useEffect(() => {
-    localStorage.setItem('alerts-showFilters', JSON.stringify(showFilters));
-  }, [showFilters]);
+  }, [schoolId]); // Recharger quand on change d'école
 
   // Effect for filtering and pagination - INSTANTANÉ
   useEffect(() => {
     applyFilter();
-  }, [selectedStatus, allAlerts]);
-
-  useEffect(() => {
-    applyPagination();
-  }, [currentPage, filteredAlerts]);
+  }, [selectedStatus, selectedRiskLevel, allAlerts]);
 
   // Filtrage local INSTANTANÉ
   const applyFilter = () => {
-    if (!allAlerts.length) return;
-    
-    let filtered = allAlerts;
-    
-    if (selectedStatus) {
-      filtered = allAlerts.filter(alert => alert.status === selectedStatus);
+    if (!allAlerts.length) {
+      setFilteredAlerts([]);
+      return;
     }
     
-    // Éviter les re-renders inutiles
-    setFilteredAlerts(prev => {
-      if (JSON.stringify(prev) === JSON.stringify(filtered)) {
-        return prev;
-      }
-      return filtered;
-    });
-    setCurrentPage(1); // Reset to first page when filtering
-  };
-
-  // Pagination locale INSTANTANÉE
-  const applyPagination = () => {
-    if (!filteredAlerts.length) return;
+    let filtered = [...allAlerts];
     
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedAlerts = filteredAlerts.slice(startIndex, endIndex);
+    // Filtrer par statut
+    if (selectedStatus) {
+      filtered = filtered.filter(alert => alert.status === selectedStatus);
+    }
     
-    // Éviter les re-renders inutiles
-    setAlerts(prev => {
-      if (JSON.stringify(prev) === JSON.stringify(paginatedAlerts)) {
-        return prev;
-      }
-      return paginatedAlerts;
-    });
+    // Filtrer par niveau de risque
+    if (selectedRiskLevel) {
+      filtered = filtered.filter(alert => alert.riskLevel === selectedRiskLevel);
+    }
+    
+    setFilteredAlerts(filtered);
+    
   };
 
   const loadAlerts = async (isInitialLoad = true) => {
@@ -104,8 +79,8 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
     setError(null);
 
     try {
-      // Charger TOUTES les alertes une seule fois
-      const data = await alertService.getAlerts(undefined, 1000, 0); // Récupérer toutes les alertes
+      // Charger TOUTES les alertes pour l'école sélectionnée
+      const data = await alertService.getAlerts(undefined, 1000, 0, schoolId); // V2: Passer schoolId
       console.log(`Loaded ${data.length} alerts`);
       setAllAlerts(data);
       
@@ -123,6 +98,7 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
     }
   };
 
+
   const refreshAlerts = async () => {
     console.log('Refreshing alerts...');
     setIsLoading(true);
@@ -131,11 +107,6 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
     try {
       // Vider le cache local
       setAllAlerts([]);
-      setFilteredAlerts([]);
-      setAlerts([]);
-      
-      // Nettoyer le localStorage des données d'alertes obsolètes
-      localStorage.removeItem('alerts-showFilters');
       
       // Recharger les alertes
       await loadAlerts(false);
@@ -157,7 +128,7 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
 
   const loadStats = async () => {
     try {
-      const data = await alertService.getAlertStats();
+      const data = await alertService.getAlertStats(schoolId); // V2: Passer schoolId
       setStats(data);
     } catch (err: any) {
       console.error('Failed to load stats:', err);
@@ -223,6 +194,19 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
     // Le filtrage se fait automatiquement via useEffect
   };
 
+  // Calculer les stats de risque en fonction du statut sélectionné
+  const getRiskStats = () => {
+    const alertsToCount = selectedStatus 
+      ? allAlerts.filter(a => a.status === selectedStatus)
+      : allAlerts;
+    
+    return {
+      CRITIQUE: alertsToCount.filter(a => a.riskLevel === 'CRITIQUE').length,
+      ELEVE: alertsToCount.filter(a => a.riskLevel === 'ELEVE').length,
+      MOYEN: alertsToCount.filter(a => a.riskLevel === 'MOYEN').length,
+    };
+  };
+
   const loadAlertComments = async (alertId: string) => {
     setLoadingComments(true);
     try {
@@ -280,6 +264,33 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
     }
   };
 
+  // Fonction pour obtenir l'icône et le texte selon le type de source
+  const getSourceInfo = (sourceType: string) => {
+    switch (sourceType) {
+      case 'CHAT':
+        return {
+          icon: MessageCircle,
+          text: 'Conversation',
+          color: 'text-blue-600 bg-blue-100',
+          description: 'Détecté dans une conversation avec Mélio'
+        };
+      case 'JOURNAL':
+        return {
+          icon: BookOpen,
+          text: 'Journal',
+          color: 'text-purple-600 bg-purple-100',
+          description: 'Détecté dans le journal intime'
+        };
+      default:
+        return {
+          icon: AlertCircle,
+          text: 'Autre',
+          color: 'text-gray-600 bg-gray-100',
+          description: 'Source inconnue'
+        };
+    }
+  };
+
 
   // Fonction pour obtenir les couleurs de carte selon le statut
   const getCardColors = (status: string) => {
@@ -315,25 +326,26 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
     }
   };
 
-  const getMoodIcon = (mood: string) => {
+  const getMoodColor = (mood: string) => {
     switch (mood) {
-      case 'TRES_TRISTE': return '😢';
-      case 'TRISTE': return '😔';
-      case 'NEUTRE': return '😐';
-      case 'CONTENT': return '😊';
-      case 'TRES_HEUREUX': return '😄';
-      default: return '😐';
+      case 'TRES_TRISTE': return 'bg-red-500';
+      case 'TRISTE': return 'bg-orange-500';
+      case 'NEUTRE': return 'bg-gray-500';
+      case 'CONTENT': return 'bg-blue-500';
+      case 'TRES_HEUREUX': return 'bg-green-500';
+      default: return 'bg-gray-500';
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('fr-FR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  const getMoodLabel = (mood: string) => {
+    switch (mood) {
+      case 'TRES_TRISTE': return 'Très triste';
+      case 'TRISTE': return 'Triste';
+      case 'NEUTRE': return 'Neutre';
+      case 'CONTENT': return 'Content';
+      case 'TRES_HEUREUX': return 'Très heureux';
+      default: return mood;
+    }
   };
 
   const getStatusText = (status: string) => {
@@ -364,244 +376,266 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 mb-4">
+    <div className="space-y-4">
+      {/* Stats en header compact */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
         <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <AlertTriangle className="w-8 h-8 text-red-500 mr-3" />
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">Alertes de sécurité</h2>
-              <p className="text-gray-600">Gestion des alertes de sécurité des élèves</p>
-            </div>
+          <div className="text-sm text-gray-600">
+            {allAlerts.length} alerte(s) affichée(s)
           </div>
-          <div className="flex items-center space-x-3">
             <button
               onClick={refreshAlerts}
-              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
-              title="Actualiser les alertes"
+            className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            title="Actualiser"
+          >
+            <RefreshCw className="w-4 h-4" />
+            </button>
+        </div>
+      </div>
+
+      {/* Filtres compacts */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
+        {/* Filtre par statut */}
+        <div className="mb-3">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+            Statut
+          </label>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => handleStatusFilter('')}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                selectedStatus === ''
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
-              <RefreshCw className="w-5 h-5" />
+              Toutes • {stats?.total || 0}
             </button>
             <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
-              title="Filtres"
+              onClick={() => handleStatusFilter('NOUVELLE')}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                selectedStatus === 'NOUVELLE'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
-              <Filter className="w-5 h-5" />
+              Nouvelles • {stats?.nouvelles || 0}
             </button>
+            <button
+              onClick={() => handleStatusFilter('EN_COURS')}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                selectedStatus === 'EN_COURS'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              En cours • {stats?.enCours || 0}
+            </button>
+            <button
+              onClick={() => handleStatusFilter('TRAITEE')}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                selectedStatus === 'TRAITEE'
+                  ? 'bg-green-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Traitées • {stats?.traitees || 0}
+            </button>
+            </div>
+          </div>
+
+        {/* Filtre par niveau de risque */}
+        <div className="pt-3 border-t border-gray-200">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+            Niveau de risque {selectedStatus && <span className="text-gray-400">({selectedStatus})</span>}
+          </label>
+          <div className="flex items-center space-x-2 flex-wrap gap-y-2">
+            <button
+              onClick={() => setSelectedRiskLevel('')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                selectedRiskLevel === ''
+                  ? 'bg-gray-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Tous niveaux
+            </button>
+            {getRiskStats().CRITIQUE > 0 && (
+              <button
+                onClick={() => setSelectedRiskLevel('CRITIQUE')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  selectedRiskLevel === 'CRITIQUE'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                }`}
+              >
+                Critique • {getRiskStats().CRITIQUE}
+              </button>
+            )}
+            {getRiskStats().ELEVE > 0 && (
+              <button
+                onClick={() => setSelectedRiskLevel('ELEVE')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  selectedRiskLevel === 'ELEVE'
+                    ? 'bg-orange-600 text-white'
+                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                }`}
+              >
+                Élevé • {getRiskStats().ELEVE}
+              </button>
+            )}
+            {getRiskStats().MOYEN > 0 && (
+              <button
+                onClick={() => setSelectedRiskLevel('MOYEN')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  selectedRiskLevel === 'MOYEN'
+                    ? 'bg-yellow-600 text-white'
+                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                }`}
+              >
+                Moyen • {getRiskStats().MOYEN}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Filtres et Statistiques */}
-      {showFilters && stats && (
-        <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 mb-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button
-              onClick={() => handleStatusFilter('')}
-              className={`rounded-xl p-3 text-center border transition-all duration-200 ${
-                selectedStatus === ''
-                  ? 'bg-gray-200 border-gray-300 shadow-md'
-                  : 'bg-white/80 border-white/20 hover:bg-gray-50'
-              }`}
-            >
-              <div className="text-lg font-bold text-gray-800">{stats.total}</div>
-              <div className="text-xs text-gray-600">Total</div>
-            </button>
-            <button
-              onClick={() => handleStatusFilter('NOUVELLE')}
-              className={`rounded-xl p-3 text-center border transition-all duration-200 ${
-                selectedStatus === 'NOUVELLE'
-                  ? 'bg-gradient-to-r from-red-100/90 to-red-200/70 border-red-300 shadow-md'
-                  : 'bg-gradient-to-r from-red-50/80 to-red-100/60 border-red-200 hover:from-red-100/90 hover:to-red-150/80'
-              }`}
-            >
-              <div className="text-lg font-bold text-red-700">{stats.nouvelles}</div>
-              <div className="text-xs text-red-600 font-medium">Nouvelles</div>
-            </button>
-            <button
-              onClick={() => handleStatusFilter('EN_COURS')}
-              className={`rounded-xl p-3 text-center border transition-all duration-200 ${
-                selectedStatus === 'EN_COURS'
-                  ? 'bg-gradient-to-r from-orange-100/90 to-orange-200/70 border-orange-300 shadow-md'
-                  : 'bg-gradient-to-r from-orange-50/80 to-orange-100/60 border-orange-200 hover:from-orange-100/90 hover:to-orange-150/80'
-              }`}
-            >
-              <div className="text-lg font-bold text-orange-700">{stats.enCours}</div>
-              <div className="text-xs text-orange-600 font-medium">En cours</div>
-            </button>
-            <button
-              onClick={() => handleStatusFilter('TRAITEE')}
-              className={`rounded-xl p-3 text-center border transition-all duration-200 ${
-                selectedStatus === 'TRAITEE'
-                  ? 'bg-gradient-to-r from-emerald-100/90 to-emerald-200/70 border-emerald-300 shadow-md'
-                  : 'bg-gradient-to-r from-emerald-50/80 to-emerald-100/60 border-emerald-200 hover:from-emerald-100/90 hover:to-emerald-150/80'
-              }`}
-            >
-              <div className="text-lg font-bold text-emerald-700">{stats.traitees}</div>
-              <div className="text-xs text-emerald-600 font-medium">Traitées</div>
-            </button>
-            </div>
-          </div>
-        )}
 
-
-      {/* Liste des alertes */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Indicateur de chargement simple */}
-        {isLoading && (
-          <div className="absolute top-0 left-0 right-0 z-20 bg-white/90 backdrop-blur-sm rounded-lg p-4 flex items-center justify-center shadow-lg">
-            <RefreshCw className="w-6 h-6 text-blue-600 animate-spin mr-2" />
-            <span className="text-gray-700">Chargement...</span>
-          </div>
-        )}
-        
-        {alerts.length === 0 && !isLoading ? (
-          <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 text-center shadow-lg border border-white/20">
-            <Shield className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-            <h3 className="text-base font-medium text-gray-700 mb-1">Aucune alerte</h3>
+      {/* Liste des alertes - Vue Table Compacte */}
+      {filteredAlerts.length === 0 && !isLoading ? (
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-12 text-center shadow-lg border border-white/20">
+          <Shield className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-700 mb-1">Aucune alerte</h3>
             <p className="text-sm text-gray-500">Aucune alerte de sécurité détectée pour le moment.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {alerts.map((alert) => {
-            const colors = getCardColors(alert.status);
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden">
+          {/* Header des colonnes */}
+          <div className="bg-gray-100 border-b-2 border-gray-300 p-4">
+            <div className="flex items-center w-full justify-between">
+              <div className="w-48 px-2">
+                <span className="text-sm text-gray-600">Élève</span>
+              </div>
+              <div className="w-24 text-center px-2">
+                <span className="text-sm text-gray-600">Source</span>
+              </div>
+              <div className="w-24 text-center px-2">
+                <span className="text-sm text-gray-600">Risque</span>
+              </div>
+              <div className="flex-1 mx-4 px-2">
+                <span className="text-sm text-gray-600">Résumé</span>
+              </div>
+              <div className="w-24 text-center px-2">
+                <span className="text-sm text-gray-600">Statut</span>
+              </div>
+              <div className="w-20 text-center px-2">
+                <span className="text-sm text-gray-600">Date</span>
+              </div>
+              <div className="w-24 text-center px-2">
+                <span className="text-sm text-gray-600">Actions</span>
+              </div>
+            </div>
+          </div>
+
+          <SimpleVirtualizedList<Alert>
+          items={filteredAlerts}
+          height={600}
+          itemHeight={80}
+          renderItem={({ item: alert }) => {
+            const sourceInfo = getSourceInfo(alert.sourceType);
+            const SourceIcon = sourceInfo.icon;
+            
             return (
               <div
                 key={alert.id}
                 onClick={() => handleOpenDetailModal(alert)}
-                className={`${colors.card} backdrop-blur-sm rounded-xl shadow-lg border border-white/20 overflow-hidden hover:shadow-xl transition-all duration-200 cursor-pointer`}
+                className="hover:bg-indigo-50/50 transition-colors cursor-pointer border-b border-gray-200 p-4 h-20 flex items-center"
               >
-              {/* Header compact */}
-              <div className={`p-3 ${colors.header}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-base">{getMoodIcon(alert.childMood)}</span>
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-800">
-                        {alert.student.firstName} {alert.student.lastName}
-                      </h3>
-                      <p className="text-xs text-gray-600">{alert.student.className}</p>
-                          </div>
+                <div className="flex items-center w-full">
+                  {/* Élève - Largeur fixe */}
+                  <div className="flex items-center space-x-3 w-48">
+                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                      {alert.student.firstName[0]}{alert.student.lastName[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-gray-800 truncate">
+                          {alert.student.firstName} {alert.student.lastName}
                       </div>
+                      <div className="text-xs text-gray-500 truncate">{alert.student.className}</div>
+                    </div>
+                  </div>
 
-                  <div className="flex items-center space-x-1">
-                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium border ${getRiskLevelColor(alert.riskLevel)}`}>
-                      {alert.riskLevel} ({alert.riskScore}/100)
+                  {/* Source - Largeur fixe */}
+                  <div className="w-24 flex justify-center">
+                    <div className="flex items-center justify-center">
+                      <SourceIcon className="w-5 h-5 text-gray-600" />
+                    </div>
+                  </div>
+
+                  {/* Risque - Largeur fixe */}
+                  <div className="w-24 flex justify-center">
+                    <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${getRiskLevelColor(alert.riskLevel)}`}>
+                      {alert.riskLevel}
                     </span>
-                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium border ${colors.badge}`}>
-                      {getStatusText(alert.status)}
-                    </span>
-                        </div>
-                        </div>
+                  </div>
 
-                {/* Résumé compact */}
-                <div className="mb-2">
-                  <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
-                    <h4 className="text-xs font-semibold text-blue-800 mb-1 flex items-center">
-                      <TrendingUp className="w-3 h-3 mr-1" />
-                      Analyse IA
-                    </h4>
-                    <p className="text-blue-700 text-xs leading-relaxed line-clamp-2">{alert.aiSummary}</p>
-                        </div>
-                      </div>
+                  {/* Résumé - Largeur fixe */}
+                  <div className="flex-1 mx-4 min-w-0">
+                    <p className="text-sm text-gray-700 line-clamp-2 truncate">{alert.aiSummary}</p>
+                  </div>
 
-                {/* Actions compactes */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Calendar className="w-3 h-3 mr-1" />
-                    {formatDate(alert.createdAt)}
-                      </div>
+                  {/* Statut - Largeur fixe */}
+                  <div className="w-24 flex justify-center">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      alert.status === 'NOUVELLE' ? 'bg-red-100 text-red-700' :
+                      alert.status === 'EN_COURS' ? 'bg-orange-100 text-orange-700' :
+                      'bg-green-100 text-green-700'
+                    }`}>
+                        {getStatusText(alert.status)}
+                      </span>
+                  </div>
 
-                  <div className="flex items-center space-x-2">
+                  {/* Date - Largeur fixe */}
+                  <div className="w-20 text-xs text-gray-600 text-center">
+                    {new Date(alert.createdAt).toLocaleDateString('fr-FR')}
+                  </div>
+
+                  {/* Actions - Largeur fixe */}
+                  <div className="w-24 flex justify-center">
                     {alert.status === 'NOUVELLE' && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleStatusChange(alert.id, 'EN_COURS');
                         }}
-                        className={`px-3 py-1 ${colors.button} rounded-lg transition-all duration-200 text-xs font-medium`}
+                      className="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-all"
                       >
-                        Prendre en charge
+                      Prendre
                       </button>
                     )}
-                    
                     {alert.status === 'EN_COURS' && (
                         <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleStatusChange(alert.id, 'TRAITEE');
                         }}
-                        className={`px-3 py-1 ${colors.button} rounded-lg transition-all duration-200 text-xs font-medium`}
+                      className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-medium transition-all"
                         >
-                        Marquer comme traitée
+                      Traiter
                         </button>
                       )}
-                  </div>
+                  {alert.status === 'TRAITEE' && (
+                    <Eye className="w-4 h-4 text-gray-400" />
+                  )}
                 </div>
               </div>
-
-              </div>
-            );
-          })}
-          </div>
-        )}
-      </div>
-
-      {/* Pagination */}
-      {filteredAlerts.length > itemsPerPage && (
-        <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20 mt-4">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              Page {currentPage} sur {Math.ceil(filteredAlerts.length / itemsPerPage)} • {alerts.length} alerte(s) sur cette page
             </div>
-            <div className="flex items-center space-x-2">
-            <button
-              onClick={() => {
-                const newPage = Math.max(1, currentPage - 1);
-                setCurrentPage(newPage);
-              }}
-              disabled={currentPage === 1}
-              className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-            >
-              Précédent
-            </button>
-            
-            <div className="flex items-center space-x-1">
-              {Array.from({ length: Math.min(5, Math.ceil(filteredAlerts.length / itemsPerPage)) }, (_, i) => {
-                const page = i + 1;
-                return (
-                  <button
-                    key={page}
-                    onClick={() => {
-                      setCurrentPage(page);
-                    }}
-                    className={`px-2 py-1 text-xs rounded transition-all duration-200 ${
-                      currentPage === page
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                );
-              })}
-            </div>
-            
-            <button
-              onClick={() => {
-                setCurrentPage(currentPage + 1);
-              }}
-              disabled={currentPage >= Math.ceil(filteredAlerts.length / itemsPerPage)}
-              className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-            >
-              Suivant
-            </button>
-            </div>
-          </div>
+          );
+          }}
+        />
         </div>
       )}
+
 
       {/* Modal de commentaire */}
       {showCommentModal && (
@@ -669,12 +703,17 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
             <div className={`p-6 ${getCardColors(selectedAlert.status).header} border-b border-gray-200`}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-4">
-                  <div className="text-4xl">{getMoodIcon(selectedAlert.childMood)}</div>
+                  <div className={`w-14 h-14 ${getMoodColor(selectedAlert.childMood)} rounded-full flex items-center justify-center shadow-lg`}>
+                    <span className="text-white font-bold text-lg">
+                      {selectedAlert.student.firstName[0]}{selectedAlert.student.lastName[0]}
+                    </span>
+                  </div>
                   <div>
                     <h2 className="text-2xl font-bold text-gray-800">
                       {selectedAlert.student.firstName} {selectedAlert.student.lastName}
                     </h2>
                     <p className="text-gray-600">{selectedAlert.student.className}</p>
+                    <p className="text-sm text-gray-500 mt-1">Humeur : {getMoodLabel(selectedAlert.childMood)}</p>
                   </div>
                 </div>
                 <button
@@ -690,13 +729,10 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
               {/* Badges de statut */}
               <div className="flex items-center space-x-2">
                 <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold border-2 ${getRiskLevelColor(selectedAlert.riskLevel)}`}>
-                  {selectedAlert.riskLevel} • Score: {selectedAlert.riskScore}/100
+                  Niveau {selectedAlert.riskLevel}
                 </span>
                 <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold border-2 ${getCardColors(selectedAlert.status).badge}`}>
                   {getStatusText(selectedAlert.status)}
-                </span>
-                <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 border border-gray-200">
-                  {formatDate(selectedAlert.createdAt)}
                 </span>
               </div>
             </div>
@@ -704,10 +740,34 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
             {/* Contenu scrollable */}
             <div className="overflow-y-auto max-h-[calc(90vh-250px)] p-6">
               <div className="space-y-6">
+                {/* Source de l'alerte */}
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-5 border-2 border-purple-200">
+                  <h3 className="text-lg font-bold text-purple-900 mb-3 flex items-center">
+                    {(() => {
+                      const sourceInfo = getSourceInfo(selectedAlert.sourceType);
+                      const SourceIcon = sourceInfo.icon;
+                      return (
+                        <>
+                          <SourceIcon className="w-5 h-5 mr-2" />
+                          Source de l'alerte
+                        </>
+                      );
+                    })()}
+                  </h3>
+                  <div className="flex items-center space-x-3">
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getSourceInfo(selectedAlert.sourceType).color}`}>
+                      {getSourceInfo(selectedAlert.sourceType).text}
+                    </span>
+                    <span className="text-purple-700 text-sm">
+                      {getSourceInfo(selectedAlert.sourceType).description}
+                    </span>
+                  </div>
+                </div>
+
                 {/* Analyse IA */}
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border-2 border-blue-200">
                   <h3 className="text-lg font-bold text-blue-900 mb-3 flex items-center">
-                    <TrendingUp className="w-5 h-5 mr-2" />
+                    <Brain className="w-5 h-5 mr-2" />
                     Analyse IA
                   </h3>
                   <p className="text-blue-800 leading-relaxed">{selectedAlert.aiSummary}</p>
@@ -722,8 +782,7 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
                   <p className="text-green-800 leading-relaxed">{selectedAlert.aiAdvice}</p>
                 </div>
 
-                {/* Informations détaillées */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Informations élève */}
                   <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
                     <h3 className="text-lg font-bold text-gray-800 mb-3">Informations élève</h3>
                     <div className="space-y-2 text-sm">
@@ -738,25 +797,6 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
                       <div className="flex justify-between">
                         <span className="font-medium text-gray-600">Humeur :</span>
                         <span className="text-gray-800">{selectedAlert.childMood}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-800 mb-3">Détails techniques</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-gray-600">Source :</span>
-                        <span className="text-gray-800">{selectedAlert.sourceType}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-gray-600">ID Alerte :</span>
-                        <span className="text-gray-800 text-xs font-mono">{selectedAlert.id.slice(0, 12)}...</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-gray-600">ID Source :</span>
-                        <span className="text-gray-800 text-xs font-mono">{selectedAlert.sourceId.slice(0, 12)}...</span>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -829,12 +869,7 @@ export default function AlertsSection({ onAlertsViewed }: AlertsSectionProps) {
             </div>
 
             {/* Footer avec actions */}
-            <div className="p-6 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <AlertCircle className="w-4 h-4" />
-                <span>Créé le : {formatDate(selectedAlert.createdAt)}</span>
-              </div>
-              
+            <div className="p-6 bg-gray-50 border-t border-gray-200 flex items-center justify-end">
               <div className="flex items-center space-x-3">
                 <button
                   onClick={handleCloseDetailModal}

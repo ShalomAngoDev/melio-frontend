@@ -41,7 +41,11 @@ interface ReportData {
   };
 }
 
-export default function SchoolReportsSection() {
+interface SchoolReportsSectionProps {
+  schoolId: string;
+}
+
+export default function SchoolReportsSection({ schoolId }: SchoolReportsSectionProps) {
   const { user } = useAuth();
   const { showSuccess, showError } = useToast();
   const [isLoading, setIsLoading] = useState(false);

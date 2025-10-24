@@ -1,46 +1,33 @@
 import { useState, useEffect } from 'react';
-import { 
+import {
   Megaphone, 
-  Eye, 
-  EyeOff, 
-  Filter, 
   RefreshCw,
-  Calendar,
-  TrendingUp,
-  Shield,
   AlertCircle,
-  User,
-  Clock,
-  CheckCircle,
-  XCircle
+  Shield,
+  X
 } from 'lucide-react';
 import { reportService, Report, ReportStats } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { useAuth } from '../../contexts/AuthContext';
+import SimpleVirtualizedList from '../common/SimpleVirtualizedList';
 
 interface ReportsSectionProps {
   onReportsViewed?: () => void;
+  schoolId: string;
 }
 
-export default function ReportsSection({ onReportsViewed }: ReportsSectionProps) {
-  const { user } = useAuth();
-  const { showSuccess, showError, showWarning } = useToast();
+export default function ReportsSection({ schoolId }: ReportsSectionProps) {
+  const { showSuccess, showError } = useToast();
   const [allReports, setAllReports] = useState<Report[]>([]);
   const [filteredReports, setFilteredReports] = useState<Report[]>([]);
-  const [reports, setReports] = useState<Report[]>([]);
   const [stats, setStats] = useState<ReportStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('NOUVEAU');
+  const [selectedUrgency, setSelectedUrgency] = useState<string>('');
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
-  const [showFilters, setShowFilters] = useState(() => {
-    const saved = localStorage.getItem('reports-showFilters');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(22);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 
-  const schoolId = user?.schoolId || '';
 
   useEffect(() => {
     if (schoolId) {
@@ -53,20 +40,28 @@ export default function ReportsSection({ onReportsViewed }: ReportsSectionProps)
     }
   }, [schoolId]);
 
-  // Sauvegarder l'état des filtres dans localStorage
-  useEffect(() => {
-    localStorage.setItem('reports-showFilters', JSON.stringify(showFilters));
-  }, [showFilters]);
-
   // Effect for filtering - INSTANTANÉ
   useEffect(() => {
     applyFilter();
-  }, [selectedStatus, allReports]);
+  }, [selectedStatus, selectedUrgency, allReports]);
 
-  // Effect for pagination - INSTANTANÉ
-  useEffect(() => {
-    applyPagination();
-  }, [currentPage, filteredReports]);
+  // Fonction de filtrage
+  const applyFilter = () => {
+    let filtered = [...allReports];
+
+    // Filtrer par statut
+    if (selectedStatus) {
+      filtered = filtered.filter(report => report.status === selectedStatus);
+    }
+
+    // Filtrer par urgence
+    if (selectedUrgency) {
+      filtered = filtered.filter(report => report.urgency === selectedUrgency);
+    }
+
+    setFilteredReports(filtered);
+  };
+
 
   // Mise à jour automatique des signalements toutes les 30 secondes
   useEffect(() => {
@@ -117,6 +112,7 @@ export default function ReportsSection({ onReportsViewed }: ReportsSectionProps)
     }
   };
 
+
   const loadStats = async () => {
     try {
       const data = await reportService.getReportStats(schoolId);
@@ -126,46 +122,26 @@ export default function ReportsSection({ onReportsViewed }: ReportsSectionProps)
     }
   };
 
-  // Filtrage local instantané
-  const applyFilter = () => {
-    if (!allReports.length) return;
-    
-    let filtered = allReports;
-    
-    if (selectedStatus) {
-      filtered = allReports.filter(report => report.status === selectedStatus);
-    }
-    
-    // Éviter les re-renders inutiles
-    setFilteredReports(prev => {
-      if (JSON.stringify(prev) === JSON.stringify(filtered)) {
-        return prev;
-      }
-      return filtered;
-    });
-    setCurrentPage(1); // Reset to first page when filtering
-  };
 
   // Pagination locale instantanée
-  const applyPagination = () => {
-    if (!filteredReports.length) return;
-    
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedReports = filteredReports.slice(startIndex, endIndex);
-    
-    // Éviter les re-renders inutiles
-    setReports(prev => {
-      if (JSON.stringify(prev) === JSON.stringify(paginatedReports)) {
-        return prev;
-      }
-      return paginatedReports;
-    });
-  };
 
   const handleStatusFilter = (status: string) => {
     setSelectedStatus(status);
     // Le filtrage se fait automatiquement via useEffect
+  };
+
+  // Calculer les stats d'urgence en fonction du statut sélectionné
+  const getUrgencyStats = () => {
+    const reportsToCount = selectedStatus 
+      ? allReports.filter(r => r.status === selectedStatus)
+      : allReports;
+    
+    return {
+      CRITICAL: reportsToCount.filter(r => r.urgency === 'CRITICAL').length,
+      HIGH: reportsToCount.filter(r => r.urgency === 'HIGH').length,
+      MEDIUM: reportsToCount.filter(r => r.urgency === 'MEDIUM').length,
+      LOW: reportsToCount.filter(r => r.urgency === 'LOW').length,
+    };
   };
 
   const handleStatusUpdate = async (reportId: string, newStatus: 'NOUVEAU' | 'EN_COURS' | 'TRAITE') => {
@@ -209,33 +185,13 @@ export default function ReportsSection({ onReportsViewed }: ReportsSectionProps)
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'NOUVEAU': return 'bg-red-50 border-red-200';
-      case 'EN_COURS': return 'bg-orange-50 border-orange-200';
-      case 'TRAITE': return 'bg-green-50 border-green-200';
-      default: return 'bg-gray-50 border-gray-200';
+      case 'NOUVEAU': return 'bg-red-100 text-red-700';
+      case 'EN_COURS': return 'bg-orange-100 text-orange-700';
+      case 'TRAITE': return 'bg-green-100 text-green-700';
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'NOUVEAU': return <AlertCircle className="w-4 h-4 text-red-600" />;
-      case 'EN_COURS': return <Clock className="w-4 h-4 text-orange-600" />;
-      case 'TRAITE': return <CheckCircle className="w-4 h-4 text-green-600" />;
-      default: return <AlertCircle className="w-4 h-4 text-gray-600" />;
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
 
   if (isLoading) {
     return (
@@ -249,204 +205,354 @@ export default function ReportsSection({ onReportsViewed }: ReportsSectionProps)
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 mb-4">
+    <div className="space-y-4">
+      {/* Stats en header compact */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
         <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Megaphone className="w-8 h-8 text-blue-500 mr-3" />
-          <div>
-              <h2 className="text-2xl font-bold text-gray-800">Signalements</h2>
-              <p className="text-gray-600">Gestion des signalements des élèves</p>
-            </div>
+          <div className="text-sm text-gray-600">
+            {allReports.length} signalement(s) affiché(s)
           </div>
-          <div className="flex items-center space-x-3">
+          <button
+            onClick={() => { loadReports(); loadStats(); }}
+            className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+            title="Actualiser"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Filtres compacts */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
+        {/* Filtre par statut */}
+        <div className="mb-3">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+            Statut
+          </label>
+          <div className="flex items-center space-x-2">
             <button
-              onClick={() => { loadReports(); loadStats(); }}
-              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
-              title="Actualiser"
+              onClick={() => handleStatusFilter('')}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                selectedStatus === ''
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
-              <RefreshCw className="w-5 h-5" />
+              Tous • {stats?.total || 0}
             </button>
             <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
-              title="Filtres"
+              onClick={() => handleStatusFilter('NOUVEAU')}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                selectedStatus === 'NOUVEAU'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
-              <Filter className="w-5 h-5" />
+              Nouveaux • {stats?.nouveau || 0}
             </button>
+            <button
+              onClick={() => handleStatusFilter('EN_COURS')}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                selectedStatus === 'EN_COURS'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              En cours • {stats?.enCours || 0}
+            </button>
+            <button
+              onClick={() => handleStatusFilter('TRAITE')}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                selectedStatus === 'TRAITE'
+                  ? 'bg-green-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Traités • {stats?.traite || 0}
+            </button>
+          </div>
+        </div>
+
+        {/* Filtre par urgence */}
+        <div className="pt-3 border-t border-gray-200">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+            Niveau d'urgence {selectedStatus && <span className="text-gray-400">({selectedStatus})</span>}
+          </label>
+          <div className="flex items-center space-x-2 flex-wrap gap-y-2">
+            <button
+              onClick={() => setSelectedUrgency('')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                selectedUrgency === ''
+                  ? 'bg-gray-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Toutes urgences
+            </button>
+            {getUrgencyStats().CRITICAL > 0 && (
+              <button
+                onClick={() => setSelectedUrgency('CRITICAL')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  selectedUrgency === 'CRITICAL'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                }`}
+              >
+                Critique • {getUrgencyStats().CRITICAL}
+              </button>
+            )}
+            {getUrgencyStats().HIGH > 0 && (
+              <button
+                onClick={() => setSelectedUrgency('HIGH')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  selectedUrgency === 'HIGH'
+                    ? 'bg-orange-600 text-white'
+                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                }`}
+              >
+                Élevée • {getUrgencyStats().HIGH}
+              </button>
+            )}
+            {getUrgencyStats().MEDIUM > 0 && (
+              <button
+                onClick={() => setSelectedUrgency('MEDIUM')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  selectedUrgency === 'MEDIUM'
+                    ? 'bg-yellow-600 text-white'
+                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                }`}
+              >
+                Moyenne • {getUrgencyStats().MEDIUM}
+              </button>
+            )}
+            {getUrgencyStats().LOW > 0 && (
+              <button
+                onClick={() => setSelectedUrgency('LOW')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  selectedUrgency === 'LOW'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                }`}
+              >
+                Faible • {getUrgencyStats().LOW}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Filtres et Statistiques */}
-      {showFilters && stats && (
-        <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 mb-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gray-800">{stats.total}</div>
-              <div className="text-sm text-gray-600">Total</div>
-            </div>
-            <div 
-              className={`text-center p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                selectedStatus === 'NOUVEAU' 
-                  ? 'bg-red-50 border-red-300 text-red-800' 
-                  : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-              }`}
-              onClick={() => handleStatusFilter('NOUVEAU')}
-            >
-              <div className="text-2xl font-bold">{stats.nouveau}</div>
-              <div className="text-sm">Nouveaux</div>
-            </div>
-            <div 
-              className={`text-center p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                selectedStatus === 'EN_COURS' 
-                  ? 'bg-orange-50 border-orange-300 text-orange-800' 
-                  : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-              }`}
-              onClick={() => handleStatusFilter('EN_COURS')}
-            >
-              <div className="text-2xl font-bold">{stats.enCours}</div>
-              <div className="text-sm">En cours</div>
-            </div>
-            <div 
-              className={`text-center p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                selectedStatus === 'TRAITE' 
-                  ? 'bg-green-50 border-green-300 text-green-800' 
-                  : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-              }`}
-              onClick={() => handleStatusFilter('TRAITE')}
-            >
-              <div className="text-2xl font-bold">{stats.traite}</div>
-              <div className="text-sm">Traités</div>
-            </div>
+      {/* Liste des signalements - Vue Table Compacte */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+            <p className="text-red-800">{error}</p>
           </div>
         </div>
       )}
 
-      {/* Liste des signalements */}
-      <div className="flex-1 overflow-y-auto">
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-            <div className="flex items-center">
-              <XCircle className="w-5 h-5 text-red-600 mr-2" />
-              <p className="text-red-800">{error}</p>
-            </div>
-          </div>
-        )}
-
-        {reports.length === 0 ? (
-          <div className="text-center py-12">
-            <Megaphone className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-800 mb-2">Aucun signalement</h3>
-            <p className="text-gray-600">
-              {selectedStatus ? `Aucun signalement avec le statut "${selectedStatus}"` : 'Aucun signalement trouvé'}
-            </p>
-                </div>
-        ) : (
-          <div className="space-y-3">
-            {reports.map((report) => (
-              <div
-                key={report.id}
-                className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/20 hover:shadow-xl transition-all duration-200"
-              >
-                <div className="flex items-start justify-between">
-                  {/* Contenu principal */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Megaphone className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                      <span className="text-sm font-medium text-gray-600">
-                        #{report.id.substring(0, 8)}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getUrgencyColor(report.urgency)}`}>
-                        {getUrgencyLabel(report.urgency)}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {formatDate(report.createdAt)}
-                      </span>
-                </div>
-                    
-                    <p className="text-sm text-gray-800 mb-2 line-clamp-2">
-                      {report.content}
-                    </p>
-                    
-                    <div className="flex items-center space-x-3 text-xs text-gray-500">
-                      <div className="flex items-center">
-                        <User className="w-3 h-3 mr-1" />
-                        <span>{report.anonymous ? 'Anonyme' : `Élève ID: ${report.studentId?.substring(0, 8)}...`}</span>
-                </div>
-                      <div className="flex items-center">
-                        <Clock className="w-3 h-3 mr-1" />
-                        <span>{new Date(report.createdAt).toLocaleTimeString()}</span>
-                </div>
-              </div>
-            </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center space-x-2 ml-4">
-                    <select
-                      value={report.status}
-                      onChange={(e) => handleStatusUpdate(report.id, e.target.value as 'NOUVEAU' | 'EN_COURS' | 'TRAITE')}
-                      className={`px-3 py-1 rounded-lg text-xs font-medium border-0 focus:ring-2 focus:ring-blue-500 ${getStatusColor(report.status)}`}
-                    >
-                      <option value="NOUVEAU">Nouveau</option>
-                      <option value="EN_COURS">En cours</option>
-                      <option value="TRAITE">Traité</option>
-                    </select>
-                    
-                    <button
-                      onClick={() => setExpandedReport(expandedReport === report.id ? null : report.id)}
-                      className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                      title={expandedReport === report.id ? 'Masquer les détails' : 'Voir les détails'}
-                    >
-                      {expandedReport === report.id ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-            </div>
+      {filteredReports.length === 0 ? (
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-12 text-center shadow-lg border border-white/20">
+          <Megaphone className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-700 mb-1">Aucun signalement</h3>
+          <p className="text-sm text-gray-500">
+            {selectedStatus ? `Aucun signalement avec le statut "${selectedStatus}"` : 'Aucun signalement trouvé'}
+          </p>
+        </div>
+      ) : (
+        <SimpleVirtualizedList<Report>
+          items={filteredReports}
+          height={600}
+          itemHeight={80}
+          renderItem={({ item: report }) => (
+            <div 
+              key={report.id}
+              onClick={() => {
+                setSelectedReport(report);
+                setShowDetailModal(true);
+              }}
+              className="hover:bg-purple-50/50 transition-colors cursor-pointer border-b border-gray-200 p-4 h-20 flex items-center"
+            >
+              <div className="flex items-center w-full">
+                {/* ID - Largeur fixe */}
+                <div className="w-20 text-center">
+                  <span className="text-xs font-mono text-gray-600">
+                    #{report.id.substring(0, 8)}
+                  </span>
                 </div>
 
-                {/* Détails expandés */}
-                {expandedReport === report.id && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-sm text-gray-700 leading-relaxed">{report.content}</p>
+                {/* Contenu - Largeur fixe */}
+                <div className="flex-1 mx-4 min-w-0">
+                  <p className="text-sm text-gray-700 line-clamp-2 truncate">{report.content}</p>
+                </div>
+
+                {/* Urgence - Largeur fixe */}
+                <div className="w-24 flex justify-center">
+                  <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${getUrgencyColor(report.urgency)}`}>
+                    {getUrgencyLabel(report.urgency)}
+                  </span>
+                </div>
+
+                {/* Auteur - Largeur fixe */}
+                <div className="w-32 flex justify-center">
+                  {report.anonymous ? (
+                    <span className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium">
+                      <Shield className="w-3 h-3 mr-1" />
+                      Anonyme
+                    </span>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        {report.student?.firstName?.[0] || 'E'}{report.student?.lastName?.[0] || ''}
+                      </div>
+                      <div className="text-xs min-w-0">
+                        <div className="font-medium text-gray-800 truncate">
+                          {report.student?.firstName && report.student?.lastName 
+                            ? `${report.student.firstName} ${report.student.lastName}`
+                            : 'Élève'
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Date - Largeur fixe */}
+                <div className="w-20 text-xs text-gray-600 text-center">
+                  {new Date(report.createdAt).toLocaleDateString('fr-FR')}
+                </div>
+
+                {/* Statut - Largeur fixe */}
+                <div className="w-28 flex justify-center">
+                  <select
+                    value={report.status}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleStatusUpdate(report.id, e.target.value as 'NOUVEAU' | 'EN_COURS' | 'TRAITE');
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer ${getStatusColor(report.status)}`}
+                  >
+                    <option value="NOUVEAU">Nouveau</option>
+                    <option value="EN_COURS">En cours</option>
+                    <option value="TRAITE">Traité</option>
+                  </select>
+                </div>
               </div>
             </div>
           )}
-        </div>
-            ))}
-          </div>
-        )}
-      </div>
+        />
+      )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20 mt-4">
-        <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              Page {currentPage} sur {totalPages} • {reports.length} signalement(s) sur cette page
-          </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Précédent
-              </button>
-              <span className="px-3 py-2 text-sm text-gray-600">
-                {currentPage} / {totalPages}
-              </span>
-          <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-                Suivant
-          </button>
+      {/* Modal de détails du signalement */}
+      {showDetailModal && selectedReport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-800">Détails du signalement</h3>
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Contenu du signalement */}
+              <div className="space-y-6">
+                {/* Informations de base */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">ID</label>
+                    <p className="text-sm text-gray-800 font-mono">#{selectedReport.id.substring(0, 8)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Date</label>
+                    <p className="text-sm text-gray-800">
+                      {new Date(selectedReport.createdAt).toLocaleDateString('fr-FR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Auteur */}
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Auteur</label>
+                  <div className="mt-1">
+                    {selectedReport.anonymous ? (
+                      <div className="flex items-center space-x-2">
+                        <Shield className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-600">Signalement anonyme</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                          {selectedReport.student?.firstName?.[0] || 'E'}{selectedReport.student?.lastName?.[0] || ''}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">
+                            {selectedReport.student?.firstName && selectedReport.student?.lastName 
+                              ? `${selectedReport.student.firstName} ${selectedReport.student.lastName}`
+                              : 'Élève'
+                            }
+                          </p>
+                          {selectedReport.student?.className && (
+                            <p className="text-xs text-gray-500">{selectedReport.student.className}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Contenu */}
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Contenu du signalement</label>
+                  <div className="mt-2 p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{selectedReport.content}</p>
+                  </div>
+                </div>
+
+                {/* Urgence */}
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Niveau d'urgence</label>
+                  <div className="mt-1">
+                    <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${getUrgencyColor(selectedReport.urgency)}`}>
+                      {getUrgencyLabel(selectedReport.urgency)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Fermer
+                </button>
+                <button
+                  onClick={() => {
+                    handleStatusUpdate(selectedReport.id, selectedReport.status === 'NOUVEAU' ? 'EN_COURS' : 'TRAITE');
+                    setShowDetailModal(false);
+                  }}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                >
+                  {selectedReport.status === 'NOUVEAU' ? 'Prendre en charge' : 'Marquer comme traité'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

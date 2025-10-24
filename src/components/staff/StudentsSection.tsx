@@ -1,37 +1,55 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Search, Filter, User, Phone, Mail, Calendar, GraduationCap, Edit, Trash2, Eye } from 'lucide-react';
+import { Users, Search, Filter, User, Phone, Calendar, GraduationCap, Eye, Download } from 'lucide-react';
 import { studentService, Student } from '../../services/api';
-import AddStudentForm from './AddStudentForm';
 import StudentDetailsModal from './StudentDetailsModal';
-import EditStudentForm from './EditStudentForm';
+import SimpleVirtualizedList from '../common/SimpleVirtualizedList';
 
-export default function StudentsSection() {
+interface StudentsSectionProps {
+  schoolId: string;
+  schoolName?: string;
+  schoolCode?: string;
+}
+
+export default function StudentsSection({ schoolId, schoolName, schoolCode }: StudentsSectionProps) {
   const [students, setStudents] = useState<Student[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
   const [classes, setClasses] = useState<string[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showEditForm, setShowEditForm] = useState(false);
-
-  // Récupérer les données depuis le contexte d'authentification
-  const schoolCode = 'JMO75-01'; // TODO: Récupérer depuis le contexte
 
   useEffect(() => {
     loadStudents();
-  }, []);
+  }, [schoolId]);
+
+  // Filtrage des étudiants
+  useEffect(() => {
+    let filtered = [...students];
+
+    // Filtrer par terme de recherche
+    if (searchTerm) {
+      filtered = filtered.filter(student => 
+        student.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.uniqueId.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Filtrer par classe
+    if (selectedClass) {
+      filtered = filtered.filter(student => student.className === selectedClass);
+    }
+
+    setFilteredStudents(filtered);
+  }, [students, searchTerm, selectedClass]);
 
   const loadStudents = async () => {
     try {
       setIsLoading(true);
-      const data = await studentService.listStudents({
-        search: searchTerm || undefined,
-        className: selectedClass || undefined,
-      });
+      const data = await studentService.listStudents({});
       setStudents(data);
       
       // Extraire les classes uniques
@@ -44,38 +62,9 @@ export default function StudentsSection() {
     }
   };
 
-  useEffect(() => {
-    loadStudents();
-  }, [searchTerm, selectedClass]);
-
-  const handleStudentAdded = () => {
-    setShowAddForm(false);
-    loadStudents();
-  };
-
-  const handleDeleteStudent = async (studentId: string) => {
-    try {
-      // TODO: Implémenter la suppression côté API
-      console.log('Delete student:', studentId);
-      setShowDeleteConfirm(null);
-      loadStudents();
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Erreur lors de la suppression');
-    }
-  };
-
-  const handleEditStudent = (student: Student) => {
-    setSelectedStudent(student);
-    setShowEditForm(true);
-  };
-
   const handleViewStudent = (student: Student) => {
     setSelectedStudent(student);
     setShowDetailsModal(true);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR');
   };
 
   const calculateAge = (birthdate: string) => {
@@ -91,324 +80,276 @@ export default function StudentsSection() {
     return age;
   };
 
-  if (showAddForm) {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('fr-FR');
+  };
+
+  const exportToExcel = () => {
+    // Créer les données CSV avec informations de l'école
+    const csvData = [
+      ['École', schoolName || 'Non spécifiée', ''],
+      ['Code d\'accès', schoolCode || 'Non spécifié', ''],
+      ['Date d\'export', new Date().toLocaleDateString('fr-FR'), ''],
+      ['', '', ''], // Ligne vide
+      ['NOM', 'Prénom', 'ID Unique'], // Header des élèves
+      ...filteredStudents.map(student => [
+        student.lastName,
+        student.firstName,
+        student.uniqueId
+      ])
+    ];
+
+    // Convertir en CSV
+    const csvContent = csvData.map(row => row.join(',')).join('\n');
+    
+    // Créer le nom de fichier avec école et code
+    const schoolNameClean = schoolName ? schoolName.replace(/[^a-zA-Z0-9]/g, '_') : 'ecole';
+    const schoolCodeClean = schoolCode ? schoolCode.replace(/[^a-zA-Z0-9]/g, '_') : 'code';
+    const fileName = `eleves_${schoolNameClean}_${schoolCodeClean}_${new Date().toISOString().split('T')[0]}.csv`;
+    
+    // Créer et télécharger le fichier
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', fileName);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (isLoading) {
     return (
-      <AddStudentForm
-        onSuccess={handleStudentAdded}
-        onCancel={() => setShowAddForm(false)}
-        schoolCode={schoolCode}
-      />
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement des élèves...</p>
+        </div>
+      </div>
     );
   }
 
-  if (showEditForm && selectedStudent) {
+  if (error) {
     return (
-      <EditStudentForm
-        student={selectedStudent}
-        onSuccess={() => {
-          setShowEditForm(false);
-          setSelectedStudent(null);
-          loadStudents();
-        }}
-        onCancel={() => {
-          setShowEditForm(false);
-          setSelectedStudent(null);
-        }}
-      />
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="flex items-center">
+          <div className="text-red-600 mr-3">
+            <Users className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-red-800 font-medium">Erreur de chargement</h3>
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white/60 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white/20">
+      {/* Header avec recherche et filtres */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center">
-              <Users className="w-6 h-6 mr-3 text-blue-600" />
-              Gestion des élèves
-            </h1>
-            <p className="text-gray-600">Gérez les élèves de votre établissement</p>
-          </div>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+            <Users className="w-8 h-8 mr-3 text-blue-600" />
+            Gestion des élèves
+          </h2>
           <button
-            onClick={() => setShowAddForm(true)}
-            className="px-6 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-all duration-200 flex items-center"
+            onClick={exportToExcel}
+            className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200"
+            title="Exporter la liste des élèves"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Ajouter un élève
+            <Download className="w-4 h-4 mr-2" />
+            Exporter
           </button>
         </div>
 
-        {/* Filtres */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Rechercher par nom ou prénom..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-            />
+        {/* Barre de recherche et filtres */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Rechercher un élève..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              />
+            </div>
           </div>
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <select
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 appearance-none"
-            >
-              <option value="">Toutes les classes</option>
-              {classes.map(className => (
-                <option key={className} value={className}>{className}</option>
-              ))}
-            </select>
+          
+          <div className="flex gap-4">
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="pl-10 pr-8 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
+              >
+                <option value="">Toutes les classes</option>
+                {classes.map((className) => (
+                  <option key={className} value={className}>
+                    {className}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white/20">
-          <div className="flex items-center">
-            <div className="bg-blue-100 p-3 rounded-2xl mr-4">
-              <Users className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-800">{students.length}</div>
-              <div className="text-sm text-gray-600">Total élèves</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white/20">
-          <div className="flex items-center">
-            <div className="bg-green-100 p-3 rounded-2xl mr-4">
-              <GraduationCap className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-800">{classes.length}</div>
-              <div className="text-sm text-gray-600">Classes</div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Liste des élèves */}
-      <div className="bg-white/60 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white/20">
+      {/* Contenu principal */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
         {isLoading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Chargement des élèves...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-12">
-            <div className="text-red-500 mb-4">
-              <Users className="w-12 h-12 mx-auto" />
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Chargement des élèves...</p>
             </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Erreur</h3>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button
-              onClick={loadStudents}
-              className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200"
-            >
-              Réessayer
-            </button>
           </div>
         ) : (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Liste des élèves ({students.length})
+              Liste des élèves ({filteredStudents.length})
             </h3>
             
-            {/* Tableau des élèves */}
+            {/* Liste virtualisée des élèves */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Nom complet
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Âge / Sexe
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Classe
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date de naissance
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Parent/Tuteur
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Téléphone
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Email
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ID unique
-                      </th>
-                      <th className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {students.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="px-6 py-12 text-center">
-                          <div className="text-gray-400 mb-4">
-                            <Users className="w-12 h-12 mx-auto" />
-                          </div>
-                          <h3 className="text-lg font-medium text-gray-800 mb-2">Aucun élève trouvé</h3>
-                          <p className="text-gray-600 mb-4">
-                            {searchTerm || selectedClass 
-                              ? 'Aucun élève ne correspond à vos critères de recherche.'
-                              : 'Commencez par ajouter votre premier élève.'
-                            }
-                          </p>
-                          {!searchTerm && !selectedClass && (
-                            <button
-                              onClick={() => setShowAddForm(true)}
-                              className="px-6 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-all duration-200 flex items-center mx-auto"
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Ajouter un élève
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ) : (
-                      students.map((student) => (
-                        <tr key={student.id} className="hover:bg-gray-50 transition-colors duration-200">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="bg-blue-100 p-2 rounded-lg mr-3">
-                                <User className="w-4 h-4 text-blue-600" />
-                              </div>
-                              <div>
-                                <div className="text-sm font-medium text-gray-900">
-                                  {student.firstName} {student.lastName}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {calculateAge(student.birthdate)} ans
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {student.sex === 'M' ? 'Masculin' : 'Féminin'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center text-sm text-gray-900">
-                              <GraduationCap className="w-4 h-4 mr-2 text-gray-400" />
-                              {student.className}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center text-sm text-gray-900">
-                              <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                              {formatDate(student.birthdate)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {student.parentName || '-'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center text-sm text-gray-900">
-                              <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                              {student.parentPhone}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {student.parentEmail || '-'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-mono">
-                              {student.uniqueId}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <div className="flex items-center justify-center space-x-2">
-                              <button
-                                onClick={() => handleViewStudent(student)}
-                                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                                title="Voir les détails"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleEditStudent(student)}
-                                className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200"
-                                title="Modifier"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setShowDeleteConfirm(student.id)}
-                                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
-                                title="Supprimer"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+              {/* Header des colonnes */}
+              <div className="bg-gray-100 border-b-2 border-gray-300 p-4">
+                <div className="flex items-center w-full justify-between">
+                  <div className="w-48 px-2">
+                    <span className="text-sm text-gray-600">Nom complet</span>
+                  </div>
+                  <div className="w-24 text-center px-2">
+                    <span className="text-sm text-gray-600">Âge / Sexe</span>
+                  </div>
+                  <div className="w-24 text-center px-2">
+                    <span className="text-sm text-gray-600">Classe</span>
+                  </div>
+                  <div className="w-28 text-center px-2">
+                    <span className="text-sm text-gray-600">Date de naissance</span>
+                  </div>
+                  <div className="w-32 text-center px-2">
+                    <span className="text-sm text-gray-600">Parent/Tuteur</span>
+                  </div>
+                  <div className="w-28 text-center px-2">
+                    <span className="text-sm text-gray-600">Téléphone</span>
+                  </div>
+                  <div className="w-24 text-center px-2">
+                    <span className="text-sm text-gray-600">ID unique</span>
+                  </div>
+                  <div className="w-28 text-center px-2">
+                    <span className="text-sm text-gray-600">Consultation</span>
+                  </div>
+                </div>
               </div>
+
+              {filteredStudents.length === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <div className="text-gray-400 mb-4">
+                    <Users className="w-12 h-12 mx-auto" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-800 mb-2">Aucun élève trouvé</h3>
+                  <p className="text-gray-600">
+                    {searchTerm || selectedClass 
+                      ? 'Aucun élève ne correspond à vos critères de recherche.'
+                      : 'Aucun élève enregistré pour le moment.'
+                    }
+                  </p>
+                </div>
+              ) : (
+                <SimpleVirtualizedList<Student>
+                  items={filteredStudents}
+                  height={600}
+                  itemHeight={80}
+                  renderItem={({ item: student }) => (
+                    <div 
+                      key={student.id}
+                      className="hover:bg-gray-50 transition-colors duration-200 border-b border-gray-200 p-4 h-20 flex items-center"
+                    >
+                      <div className="flex items-center w-full justify-between">
+                        {/* Nom complet */}
+                        <div className="flex items-center w-48 px-2">
+                          <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                            <User className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate">
+                              {student.firstName} {student.lastName}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Âge / Sexe */}
+                        <div className="w-24 text-center px-2">
+                          <div className="text-sm text-gray-900">
+                            {calculateAge(student.birthdate)} ans
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {student.sex === 'M' ? 'M' : 'F'}
+                          </div>
+                        </div>
+
+                        {/* Classe */}
+                        <div className="w-24 flex items-center justify-center px-2">
+                          <div className="flex items-center text-sm text-gray-900">
+                            <GraduationCap className="w-4 h-4 mr-1 text-gray-400" />
+                            {student.className}
+                          </div>
+                        </div>
+
+                        {/* Date de naissance */}
+                        <div className="w-28 text-center px-2">
+                          <div className="flex items-center justify-center text-sm text-gray-900">
+                            <Calendar className="w-4 h-4 mr-1 text-gray-400" />
+                            {formatDate(student.birthdate)}
+                          </div>
+                        </div>
+
+                        {/* Parent/Tuteur */}
+                        <div className="w-32 text-center px-2">
+                          <div className="text-sm text-gray-900 truncate">
+                            {student.parentName || '-'}
+                          </div>
+                        </div>
+
+                        {/* Téléphone */}
+                        <div className="w-28 text-center px-2">
+                          <div className="flex items-center justify-center text-sm text-gray-900">
+                            <Phone className="w-4 h-4 mr-1 text-gray-400" />
+                            {student.parentPhone || '-'}
+                          </div>
+                        </div>
+
+                        {/* ID unique */}
+                        <div className="w-24 text-center px-2">
+                          <div className="text-sm text-gray-900 font-mono truncate">
+                            {student.uniqueId}
+                          </div>
+                        </div>
+
+                        {/* Consultation */}
+                        <div className="w-28 flex justify-center px-2">
+                          <button
+                            onClick={() => handleViewStudent(student)}
+                            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200"
+                            title="Voir les détails"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                />
+              )}
             </div>
           </div>
         )}
       </div>
-
-      {/* Modal de confirmation de suppression */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full mx-4 shadow-xl">
-            <div className="flex items-center mb-4">
-              <div className="bg-red-100 p-3 rounded-2xl mr-4">
-                <Trash2 className="w-6 h-6 text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800">Supprimer l'élève</h3>
-                <p className="text-sm text-gray-600">Cette action est irréversible</p>
-              </div>
-            </div>
-            
-            <p className="text-gray-700 mb-6">
-              Êtes-vous sûr de vouloir supprimer cet élève ? Toutes ses données seront définitivement supprimées.
-            </p>
-            
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowDeleteConfirm(null)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all duration-200"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => handleDeleteStudent(showDeleteConfirm)}
-                className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all duration-200"
-              >
-                Supprimer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal de détails de l'élève */}
       {showDetailsModal && selectedStudent && (

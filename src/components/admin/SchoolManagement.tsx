@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { adminService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import SimpleVirtualizedList from '../common/SimpleVirtualizedList';
 
 interface SchoolData {
   id: string;
@@ -61,8 +62,6 @@ export default function SchoolManagement({ onSchoolUpdate }: SchoolManagementPro
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredSchools, setFilteredSchools] = useState<SchoolData[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(30);
 
   // Charger les écoles au montage du composant
   useEffect(() => {
@@ -93,8 +92,6 @@ export default function SchoolManagement({ onSchoolUpdate }: SchoolManagementPro
 
       return () => clearTimeout(timeoutId);
     }
-    // Réinitialiser la page à 1 lors du changement de recherche
-    setCurrentPage(1);
   }, [schools, searchTerm]);
 
   const loadSchools = async () => {
@@ -233,17 +230,6 @@ export default function SchoolManagement({ onSchoolUpdate }: SchoolManagementPro
     }
   };
 
-  // Calculer les données de pagination
-  const totalPages = Math.ceil(filteredSchools.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentSchools = filteredSchools.slice(startIndex, endIndex);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    // Scroll vers le haut de la liste
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   return (
     <div className="space-y-6">
@@ -293,176 +279,137 @@ export default function SchoolManagement({ onSchoolUpdate }: SchoolManagementPro
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {isSearching ? (
-            <div className="col-span-full text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <h3 className="text-lg font-medium text-gray-500 mb-2">Recherche en cours...</h3>
-              <p className="text-gray-400">Recherche de "{searchTerm}"</p>
-            </div>
-          ) : filteredSchools.length === 0 ? (
-            <div className="col-span-full text-center py-12">
-              <School className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-500 mb-2">
-                {searchTerm ? 'Aucune école trouvée' : 'Aucune école disponible'}
-              </h3>
-              <p className="text-gray-400">
-                {searchTerm 
-                  ? `Aucune école ne correspond à "${searchTerm}"`
-                  : 'Commencez par ajouter une école'
-                }
-              </p>
-            </div>
-          ) : (
-            currentSchools.map((school) => (
-            <div
-              key={school.id}
-              className={`p-3 rounded-lg border-2 transition-all duration-200 cursor-pointer ${
-                selectedSchool?.id === school.id
-                  ? 'border-blue-300 bg-blue-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
-              }`}
-              onClick={() => setSelectedSchool(school)}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-gray-800 text-sm mb-1 truncate" title={school.name}>
-                    {school.name}
-                  </h4>
-                  <p className="text-xs text-gray-600 mb-1">Code: {school.code}</p>
-                  <p className="text-xs text-gray-500 truncate" title={`${school.city}, ${school.country}`}>
-                    {school.city}, {school.country}
-                  </p>
+        {isSearching ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <h3 className="text-lg font-medium text-gray-500 mb-2">Recherche en cours...</h3>
+            <p className="text-gray-400">Recherche de "{searchTerm}"</p>
+          </div>
+        ) : filteredSchools.length === 0 ? (
+          <div className="text-center py-12">
+            <School className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-500 mb-2">
+              {searchTerm ? 'Aucune école trouvée' : 'Aucune école disponible'}
+            </h3>
+            <p className="text-gray-400">
+              {searchTerm 
+                ? `Aucune école ne correspond à "${searchTerm}"`
+                : 'Commencez par ajouter une école'
+              }
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden">
+            {/* Header des colonnes */}
+            <div className="bg-gray-100 border-b-2 border-gray-300 p-4">
+              <div className="flex items-center w-full justify-between">
+                <div className="w-64 px-2">
+                  <span className="text-sm text-gray-600">Nom de l'école</span>
                 </div>
-                <div className={`px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${getStatusColor(school.status)}`}>
-                  {getStatusLabel(school.status)}
+                <div className="w-24 text-center px-2">
+                  <span className="text-sm text-gray-600">Code</span>
+                </div>
+                <div className="w-32 text-center px-2">
+                  <span className="text-sm text-gray-600">Ville</span>
+                </div>
+                <div className="w-24 text-center px-2">
+                  <span className="text-sm text-gray-600">Statut</span>
+                </div>
+                <div className="w-28 text-center px-2">
+                  <span className="text-sm text-gray-600">Actions</span>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex space-x-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditSchool(school);
-                    }}
-                    className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                    title="Modifier l'école"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteSchool(school);
-                    }}
-                    className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
-                    title="Supprimer l'école"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowAgents(!showAgents);
-                  }}
-                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                  title="Voir les agents"
+            <SimpleVirtualizedList<SchoolData>
+              items={filteredSchools}
+              height={600}
+              itemHeight={80}
+              renderItem={({ item: school }) => (
+                <div
+                  key={school.id}
+                  className={`hover:bg-blue-50/50 transition-colors cursor-pointer border-b border-gray-200 p-4 h-20 flex items-center ${
+                    selectedSchool?.id === school.id ? 'bg-blue-50' : ''
+                  }`}
+                  onClick={() => setSelectedSchool(school)}
                 >
-                  <Users className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-            ))
-          )}
-        </div>
+                  <div className="flex items-center w-full justify-between">
+                    {/* Nom de l'école - Largeur fixe */}
+                    <div className="flex items-center w-64 px-2">
+                      <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                        <School className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate" title={school.name}>
+                          {school.name}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {school.level} • {school.country}
+                        </div>
+                      </div>
+                    </div>
 
-        {/* Pagination */}
-        {filteredSchools.length > itemsPerPage && (
-          <div className="mt-6 flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              Affichage de {startIndex + 1} à {Math.min(endIndex, filteredSchools.length)} sur {filteredSchools.length} école(s)
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Précédent
-              </button>
-              
-              <div className="flex items-center space-x-1">
-                {(() => {
-                  const pages = [];
-                  const maxVisiblePages = 5;
-                  
-                  if (totalPages <= maxVisiblePages) {
-                    // Afficher toutes les pages si peu de pages
-                    for (let i = 1; i <= totalPages; i++) {
-                      pages.push(i);
-                    }
-                  } else {
-                    // Logique de pagination intelligente
-                    if (currentPage <= 3) {
-                      // Début de la liste
-                      for (let i = 1; i <= 4; i++) {
-                        pages.push(i);
-                      }
-                      pages.push('...');
-                      pages.push(totalPages);
-                    } else if (currentPage >= totalPages - 2) {
-                      // Fin de la liste
-                      pages.push(1);
-                      pages.push('...');
-                      for (let i = totalPages - 3; i <= totalPages; i++) {
-                        pages.push(i);
-                      }
-                    } else {
-                      // Milieu de la liste
-                      pages.push(1);
-                      pages.push('...');
-                      for (let i = currentPage - 1; i <= currentPage + 1; i++) {
-                        pages.push(i);
-                      }
-                      pages.push('...');
-                      pages.push(totalPages);
-                    }
-                  }
-                  
-                  return pages.map((page, index) => (
-                    page === '...' ? (
-                      <span key={`ellipsis-${index}`} className="px-2 py-2 text-gray-500">
-                        ...
+                    {/* Code - Largeur fixe */}
+                    <div className="w-24 text-center px-2">
+                      <div className="text-sm text-gray-900 font-mono">
+                        {school.code}
+                      </div>
+                    </div>
+
+                    {/* Ville - Largeur fixe */}
+                    <div className="w-32 text-center px-2">
+                      <div className="text-sm text-gray-900 truncate">
+                        {school.city}
+                      </div>
+                    </div>
+
+                    {/* Statut - Largeur fixe */}
+                    <div className="w-24 flex justify-center px-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(school.status)}`}>
+                        {getStatusLabel(school.status)}
                       </span>
-                    ) : (
+                    </div>
+
+                    {/* Actions - Largeur fixe */}
+                    <div className="w-28 flex justify-center space-x-1 px-2">
                       <button
-                        key={page}
-                        onClick={() => handlePageChange(page as number)}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg ${
-                          currentPage === page
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
-                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditSchool(school);
+                        }}
+                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                        title="Modifier l'école"
                       >
-                        {page}
+                        <Edit3 className="w-3.5 h-3.5" />
                       </button>
-                    )
-                  ));
-                })()}
-              </div>
-              
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Suivant
-              </button>
-            </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSchool(school);
+                        }}
+                        className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
+                        title="Supprimer l'école"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowAgents(!showAgents);
+                        }}
+                        className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                        title="Voir les agents"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            />
           </div>
         )}
+
       </div>
 
       {/* Détails de l'école sélectionnée */}
@@ -627,6 +574,7 @@ export default function SchoolManagement({ onSchoolUpdate }: SchoolManagementPro
                       onChange={(e) => setNewAgent({ ...newAgent, email: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="agent@exemple.fr"
+                      autoComplete="email"
                     />
                   </div>
                   <div>
@@ -637,6 +585,7 @@ export default function SchoolManagement({ onSchoolUpdate }: SchoolManagementPro
                       onChange={(e) => setNewAgent({ ...newAgent, password: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Mot de passe"
+                      autoComplete="new-password"
                     />
                   </div>
                 </div>

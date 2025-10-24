@@ -11,7 +11,11 @@ interface AgentInfo {
   role: string;
 }
 
-export default function SchoolInfoSection() {
+interface SchoolInfoSectionProps {
+  schoolId: string;
+}
+
+export default function SchoolInfoSection({ schoolId }: SchoolInfoSectionProps) {
   const { user } = useAuth();
   const [schoolInfo, setSchoolInfo] = useState<SchoolInfo | null>(null);
   const [agentInfo, setAgentInfo] = useState<AgentInfo | null>(null);
@@ -20,21 +24,21 @@ export default function SchoolInfoSection() {
 
   useEffect(() => {
     loadSchoolAndAgentInfo();
-  }, []);
+  }, [schoolId]);
 
   const loadSchoolAndAgentInfo = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      // Récupérer les vraies données de l'API
-      const schoolData = await schoolService.getMySchoolInfo();
+      // V2: Pour agents multi-écoles, récupérer l'école spécifique via l'API
+      const schoolData = await schoolService.getSchoolInfo(schoolId);
       setSchoolInfo(schoolData);
 
       const agentInfo: AgentInfo = {
         id: user?.id || '',
-        email: user?.email || 'agent@college-victor-hugo.fr',
-        schoolId: user?.schoolId || '',
+        email: user?.email || '',
+        schoolId: schoolId,
         role: 'ROLE_AGENT',
       };
       setAgentInfo(agentInfo);
