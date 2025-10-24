@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Search, Filter, User, Phone, Calendar, GraduationCap, Edit, Trash2, Eye, Upload, Download, ArrowLeft } from 'lucide-react';
+import { Users, Plus, Search, Filter, User, Phone, Calendar, GraduationCap, Edit, Trash2, Eye, Upload, Download, ArrowLeft, FileText } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { adminService } from '../../services/api';
 import AddStudentForm from './AddStudentForm';
 import EditStudentForm from './EditStudentForm';
 import ImportStudentsForm from './ImportStudentsForm';
+import VirtualizedList from '../common/VirtualizedList';
 
 interface Student {
   id: string;
@@ -27,10 +30,12 @@ interface SchoolStudentsManagementProps {
 
 export default function SchoolStudentsManagement({ schoolId, schoolName, onBack }: SchoolStudentsManagementProps) {
   const [isLoading, setIsLoading] = useState(true);
+  const [paginationLoading, setPaginationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
@@ -39,6 +44,7 @@ export default function SchoolStudentsManagement({ schoolId, schoolName, onBack 
   // État local pour les étudiants
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
+  const [hasNextPage, setHasNextPage] = useState(true);
 
   useEffect(() => {
     loadStudents();
@@ -79,6 +85,16 @@ export default function SchoolStudentsManagement({ schoolId, schoolName, onBack 
       setError(err.response?.data?.message || err.message || 'Erreur lors du chargement des élèves');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadMore = async (fetchFunction: () => Promise<void>) => {
+    if (paginationLoading) return;
+    setPaginationLoading(true);
+    try {
+      await fetchFunction();
+    } finally {
+      setPaginationLoading(false);
     }
   };
 
@@ -132,11 +148,113 @@ export default function SchoolStudentsManagement({ schoolId, schoolName, onBack 
 
   const handleViewStudent = (student: Student) => {
     setSelectedStudent(student);
-    // TODO: Implémenter modal de détails
+    setShowViewModal(true);
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR');
+  };
+
+  // Fonction d'export PDF des données des élèves
+  const exportStudentsData = () => {
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    
+    // Configuration des couleurs
+    const primaryColor = '#4F46E5'; // Indigo
+    const secondaryColor = '#F3F4F6'; // Gris clair
+    const textColor = '#374151'; // Gris foncé
+    
+    // En-tête du document
+    doc.setFillColor(primaryColor);
+    doc.rect(0, 0, 297, 20, 'F');
+    
+    // Titre principal
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Liste des Élèves', 20, 12);
+    
+    // Informations de l'école
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${schoolName}`, 20, 18);
+    
+    // Date d'export
+    const exportDate = new Date().toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    doc.text(`Exporté le ${exportDate}`, 200, 18);
+    
+    // Préparation des données pour le tableau
+    const tableData = filteredStudents.map(student => [
+      student.lastName,
+      student.firstName,
+      student.uniqueId,
+      student.className,
+      student.sex === 'M' ? 'Garçon' : 'Fille',
+      new Date(student.birthdate).toLocaleDateString('fr-FR'),
+      student.parentName || 'Non renseigné',
+      student.parentPhone || 'Non renseigné',
+      student.parentEmail || 'Non renseigné'
+    ]);
+    
+    // Configuration du tableau
+    const tableConfig = {
+      startY: 25,
+      head: [['Nom', 'Prénom', 'ID Unique', 'Classe', 'Sexe', 'Date de naissance', 'Parent', 'Téléphone', 'Email']],
+      body: tableData,
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+        overflow: 'linebreak',
+        halign: 'left'
+      },
+      headStyles: {
+        fillColor: primaryColor,
+        textColor: 255,
+        fontStyle: 'bold',
+        fontSize: 9
+      },
+      alternateRowStyles: {
+        fillColor: secondaryColor
+      },
+      columnStyles: {
+        0: { cellWidth: 35 }, // Nom
+        1: { cellWidth: 35 }, // Prénom
+        2: { cellWidth: 30 }, // ID Unique
+        3: { cellWidth: 25 }, // Classe
+        4: { cellWidth: 25 }, // Sexe
+        5: { cellWidth: 35 }, // Date de naissance
+        6: { cellWidth: 35 }, // Parent
+        7: { cellWidth: 35 }, // Téléphone
+        8: { cellWidth: 42 }  // Email
+      },
+      margin: { top: 25, right: 0, bottom: 15, left: 0 },
+      tableWidth: 'wrap'
+    };
+    
+    // Génération du tableau
+    autoTable(doc, tableConfig);
+    
+    // Pied de page
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      
+      // Numéro de page
+      doc.setTextColor(textColor);
+      doc.setFontSize(8);
+      doc.text(`Page ${i} sur ${pageCount}`, 20, 200);
+      
+      // Logo ou signature
+      doc.text('Melio - Plateforme de Soutien Scolaire', 200, 200);
+    }
+    
+    // Téléchargement du PDF
+    const fileName = `eleves_${schoolName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
   };
 
   const calculateAge = (birthdate: string) => {
@@ -217,6 +335,14 @@ export default function SchoolStudentsManagement({ schoolId, schoolName, onBack 
               </div>
             </div>
             <div className="flex items-center space-x-3">
+              <button
+                onClick={exportStudentsData}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all duration-200 flex items-center"
+                title="Exporter la liste des élèves en PDF"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Exporter PDF
+              </button>
               <button
                 onClick={() => setShowImportForm(true)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center"
@@ -344,158 +470,267 @@ export default function SchoolStudentsManagement({ schoolId, schoolName, onBack 
               </button>
             </div>
           ) : (
-            <VirtualizedTable
-              data={filteredStudents}
-              columns={[
-                {
-                  key: 'name',
-                  label: 'Nom complet',
-                  width: 200,
-                  render: (student: Student) => (
-                    <div className="flex items-center">
-                      <div className="bg-indigo-100 p-2 rounded-lg mr-3">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {/* Header du tableau */}
+              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-700">
+                  <div className="flex items-center space-x-2">
+                    <User className="w-4 h-4" />
+                    <span>Nom complet</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <GraduationCap className="w-4 h-4" />
+                    <span>Classe</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span>Sexe</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Phone className="w-4 h-4" />
+                    <span>Contact parent</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="w-4 h-4" />
+                    <span>Date de naissance</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <span>Actions</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Liste virtualisée */}
+              <VirtualizedList
+                items={filteredStudents}
+                height={520}
+                itemHeight={80}
+              renderItem={({ index, style, item: student }) => (
+                <div style={style} className="flex items-center px-6 py-4 border-b border-gray-100 hover:bg-gray-50">
+                  <div className="flex-1 grid grid-cols-6 gap-4 items-center">
+                    {/* Nom complet */}
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
                         <User className="w-4 h-4 text-indigo-600" />
                       </div>
                       <div>
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="font-medium text-gray-900">
                           {student.firstName} {student.lastName}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {student.uniqueId}
                         </div>
                       </div>
                     </div>
-                  ),
-                },
-                {
-                  key: 'age',
-                  label: 'Âge / Sexe',
-                  width: 120,
-                  render: (student: Student) => (
-                    <div>
-                      <div className="text-sm text-gray-900">
-                        {calculateAge(student.birthdate)} ans
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {student.sex === 'M' ? 'Masculin' : 'Féminin'}
-                      </div>
+                    
+                    {/* Classe */}
+                    <div className="flex items-center space-x-2">
+                      <GraduationCap className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-700">
+                        {student.className}
+                      </span>
                     </div>
-                  ),
-                },
-                {
-                  key: 'class',
-                  label: 'Classe',
-                  width: 120,
-                  render: (student: Student) => (
-                    <div className="flex items-center text-sm text-gray-900">
-                      <GraduationCap className="w-4 h-4 mr-2 text-gray-400" />
-                      {student.className}
+                    
+                    {/* Sexe */}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      student.sex === 'M' 
+                        ? 'bg-blue-100 text-blue-800' 
+                        : 'bg-pink-100 text-pink-800'
+                    }`}>
+                      {student.sex === 'M' ? 'Garçon' : 'Fille'}
+                    </span>
+                    
+                    {/* Contact parent */}
+                    <div className="text-sm">
+                      {student.parentName && (
+                        <div className="font-medium text-gray-900">
+                          {student.parentName}
+                        </div>
+                      )}
+                      {student.parentPhone && (
+                        <div className="flex items-center space-x-1 text-gray-600">
+                          <Phone className="w-3 h-3" />
+                          <span>{student.parentPhone}</span>
+                        </div>
+                      )}
                     </div>
-                  ),
-                },
-                {
-                  key: 'birthdate',
-                  label: 'Date de naissance',
-                  width: 140,
-                  render: (student: Student) => (
-                    <div className="flex items-center text-sm text-gray-900">
-                      <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                      {formatDate(student.birthdate)}
+                    
+                    {/* Date de naissance */}
+                    <div className="flex items-center space-x-2 text-sm text-gray-600">
+                      <Calendar className="w-4 h-4" />
+                      <span>
+                        {new Date(student.birthdate).toLocaleDateString('fr-FR')}
+                      </span>
                     </div>
-                  ),
-                },
-                {
-                  key: 'parent',
-                  label: 'Parent/Tuteur',
-                  width: 150,
-                  render: (student: Student) => (
-                    <div className="text-sm text-gray-900">
-                      {student.parentName || '-'}
-                    </div>
-                  ),
-                },
-                {
-                  key: 'phone',
-                  label: 'Téléphone',
-                  width: 140,
-                  render: (student: Student) => (
-                    <div className="flex items-center text-sm text-gray-900">
-                      <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                      {student.parentPhone}
-                    </div>
-                  ),
-                },
-                {
-                  key: 'uniqueId',
-                  label: 'ID unique',
-                  width: 120,
-                  render: (student: Student) => (
-                    <div className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-mono">
-                      {student.uniqueId}
-                    </div>
-                  ),
-                },
-                {
-                  key: 'actions',
-                  label: 'Actions',
-                  width: 120,
-                  render: (student: Student) => (
-                    <div className="flex items-center justify-center space-x-2">
+                    
+                    {/* Actions */}
+                    <div className="flex items-center space-x-2">
                       <button
                         onClick={() => handleViewStudent(student)}
-                        className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200"
-                        title="Voir les détails"
+                        className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                        title="Voir"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleEditStudent(student)}
-                        className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200"
+                        className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200"
                         title="Modifier"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDeleteStudent(student.id)}
+                        onClick={() => handleDeleteStudent(student)}
                         className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
                         title="Supprimer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  ),
-                },
-              ]}
-              height={600}
-              rowHeight={80}
+                  </div>
+                </div>
+              )}
               loading={paginationLoading}
               onLoadMore={() => loadMore(fetchStudents)}
               hasNextPage={hasNextPage}
-              emptyState={
-                <div className="text-center py-12">
-                  <div className="text-gray-400 mb-4">
-                    <Users className="w-12 h-12 mx-auto" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-800 mb-2">Aucun élève trouvé</h3>
-                  <p className="text-gray-600 mb-4">
-                    {searchTerm || selectedClass 
-                      ? 'Aucun élève ne correspond à vos critères de recherche.'
-                      : 'Commencez par ajouter votre premier élève.'
-                    }
-                  </p>
-                  {!searchTerm && !selectedClass && (
-                    <button
-                      onClick={() => setShowAddForm(true)}
-                      className="px-6 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-all duration-200 flex items-center mx-auto"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Ajouter un élève
-                    </button>
-                  )}
-                </div>
-              }
-            />
+              />
+            </div>
           )}
         </div>
         </div>
       </div>
+
+      {/* Modal de visualisation des détails de l'élève */}
+      {showViewModal && selectedStudent && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          {/* Header du modal */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
+                <User className="w-6 h-6 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  {selectedStudent.firstName} {selectedStudent.lastName}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {selectedStudent.uniqueId}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowViewModal(false)}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Contenu du modal */}
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Informations personnelles */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-medium text-gray-900 mb-4">Informations personnelles</h4>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <GraduationCap className="w-5 h-5 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">Classe</p>
+                      <p className="font-medium text-gray-900">{selectedStudent.className}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <Calendar className="w-5 h-5 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">Date de naissance</p>
+                      <p className="font-medium text-gray-900">
+                        {new Date(selectedStudent.birthdate).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <span className="text-gray-400">👤</span>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Sexe</p>
+                      <p className="font-medium text-gray-900">
+                        {selectedStudent.sex === 'M' ? 'Garçon' : 'Fille'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informations de contact */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-medium text-gray-900 mb-4">Contact parent</h4>
+                
+                <div className="space-y-3">
+                  {selectedStudent.parentName && (
+                    <div className="flex items-center space-x-3">
+                      <User className="w-5 h-5 text-gray-400" />
+                      <div>
+                        <p className="text-sm text-gray-500">Nom du parent</p>
+                        <p className="font-medium text-gray-900">{selectedStudent.parentName}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedStudent.parentPhone && (
+                    <div className="flex items-center space-x-3">
+                      <Phone className="w-5 h-5 text-gray-400" />
+                      <div>
+                        <p className="text-sm text-gray-500">Téléphone</p>
+                        <p className="font-medium text-gray-900">{selectedStudent.parentPhone}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedStudent.parentEmail && (
+                    <div className="flex items-center space-x-3">
+                      <div className="w-5 h-5 flex items-center justify-center">
+                        <span className="text-gray-400">📧</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Email</p>
+                        <p className="font-medium text-gray-900">{selectedStudent.parentEmail}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowViewModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-200"
+              >
+                Fermer
+              </button>
+              <button
+                onClick={() => {
+                  setShowViewModal(false);
+                  handleEditStudent(selectedStudent);
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all duration-200 flex items-center space-x-2"
+              >
+                <Edit className="w-4 h-4" />
+                <span>Modifier</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
     </div>
   );
 }
