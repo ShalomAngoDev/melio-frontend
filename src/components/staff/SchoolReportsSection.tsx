@@ -140,9 +140,9 @@ export default function SchoolReportsSection({ schoolId }: SchoolReportsSectionP
       const reportData: ReportData = {
         period: selectedPeriod,
         totalAlerts: generalStats.totalAlerts,
-        newAlerts: generalStats.alertsByStatus?.NOUVELLE || 0,
-        inProgressAlerts: generalStats.alertsByStatus?.EN_COURS || 0,
-        resolvedAlerts: generalStats.alertsByStatus?.TRAITEE || 0,
+        newAlerts: generalStats.alertsByStatus?.pending || 0,
+        inProgressAlerts: generalStats.alertsByStatus?.acknowledged || 0,
+        resolvedAlerts: generalStats.alertsByStatus?.resolved || 0,
         totalReports: generalStats.totalReports,
         newReports: generalStats.reportsByStatus?.NOUVEAU || 0,
         inProgressReports: generalStats.reportsByStatus?.EN_COURS || 0,

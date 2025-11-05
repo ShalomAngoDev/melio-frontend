@@ -45,14 +45,14 @@ export default function StaffDashboard() {
           return;
         }
         
-        const alerts = await alertService.getAlerts('NOUVELLE', undefined, undefined, selectedSchoolId); // V2: Passer schoolId
+        const alerts = await alertService.getAlerts('pending', undefined, undefined, selectedSchoolId);
         const currentCount = alerts.length;
         
         // Si l'agent a consulté les alertes et qu'il n'y en a plus de nouvelles, cacher le badge
         if (hasViewedAlerts && currentCount === 0) {
           setNewAlertsCount(0);
         } else {
-          // Sinon, afficher le nombre réel d'alertes "NOUVELLE"
+          // Sinon, afficher le nombre réel d'alertes "pending"
           setNewAlertsCount(currentCount);
           
           // Si de nouvelles alertes arrivent après consultation, réinitialiser l'état "vu"
@@ -69,12 +69,14 @@ export default function StaffDashboard() {
       }
     };
 
-    loadNewAlertsCount();
-    
-    // Actualiser toutes les 30 secondes
-    const interval = setInterval(loadNewAlertsCount, 30000);
-    
-    return () => clearInterval(interval);
+    if (selectedSchoolId) {
+      loadNewAlertsCount();
+      
+      // Actualiser toutes les 30 secondes
+      const interval = setInterval(loadNewAlertsCount, 30000);
+      
+      return () => clearInterval(interval);
+    }
   }, [selectedSchoolId, hasViewedAlerts]);
 
   // Charger le nombre de signalements nouveaux pour l'école sélectionnée
@@ -122,9 +124,9 @@ export default function StaffDashboard() {
     }
   }, [selectedSchoolId, hasViewedReports]);
 
-  // Fonction pour réinitialiser le compteur d'alertes
+  // Fonction pour marquer les alertes comme consultées
   const handleAlertsViewed = () => {
-    setNewAlertsCount(0);
+    // Marquer comme consulté
     setHasViewedAlerts(true);
   };
 

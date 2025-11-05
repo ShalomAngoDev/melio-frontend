@@ -40,6 +40,8 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
   useEffect(() => {
     const initializeData = async () => {
       await Promise.all([loadAlerts(), loadStats()]);
+      // Auto-filtrer sur les nouvelles alertes (pending) au chargement
+      setSelectedStatus('pending');
     };
     initializeData();
   }, [schoolId]); // Recharger quand on change d'école
@@ -51,7 +53,8 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
 
   // Filtrage local INSTANTANÉ
   const applyFilter = () => {
-    if (!allAlerts.length) {
+    // S'assurer que allAlerts est un tableau
+    if (!Array.isArray(allAlerts) || !allAlerts.length) {
       setFilteredAlerts([]);
       return;
     }
@@ -60,7 +63,7 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
     
     // Filtrer par statut
     if (selectedStatus) {
-      filtered = filtered.filter(alert => alert.status === selectedStatus);
+      filtered = filtered.filter(alert => alert.statusRaw === selectedStatus);
     }
     
     // Filtrer par niveau de risque
@@ -81,8 +84,8 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
     try {
       // Charger TOUTES les alertes pour l'école sélectionnée
       const data = await alertService.getAlerts(undefined, 1000, 0, schoolId); // V2: Passer schoolId
-      console.log(`Loaded ${data.length} alerts`);
-      setAllAlerts(data);
+      console.log(`Loaded ${data?.length || 0} alerts`);
+      setAllAlerts(data || []); // S'assurer que c'est toujours un tableau
       
       // Notifier que les alertes ont été vues
       if (onAlertsViewed) {
@@ -91,6 +94,7 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
     } catch (err: any) {
       console.error('Failed to load alerts:', err);
       setError(err.response?.data?.message || err.message || 'Erreur lors du chargement des alertes');
+      setAllAlerts([]); // En cas d'erreur, initialiser avec un tableau vide
     } finally {
       if (isInitialLoad) {
         setIsLoading(false);
@@ -196,8 +200,13 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
 
   // Calculer les stats de risque en fonction du statut sélectionné
   const getRiskStats = () => {
+    // S'assurer que allAlerts est un tableau
+    if (!Array.isArray(allAlerts)) {
+      return { CRITIQUE: 0, ELEVE: 0, MOYEN: 0 };
+    }
+    
     const alertsToCount = selectedStatus 
-      ? allAlerts.filter(a => a.status === selectedStatus)
+      ? allAlerts.filter(a => a.statusRaw === selectedStatus)
       : allAlerts;
     
     return {
@@ -256,10 +265,15 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
 
   const getRiskLevelColor = (level: string) => {
     switch (level) {
-      case 'CRITIQUE': return 'text-red-600 bg-red-100 border-red-200';
-      case 'ELEVE': return 'text-orange-600 bg-orange-100 border-orange-200';
-      case 'MOYEN': return 'text-yellow-600 bg-yellow-100 border-yellow-200';
-      case 'FAIBLE': return 'text-gray-600 bg-gray-100 border-gray-200';
+      case 'CRITIQUE':
+      case 'T3': return 'text-red-600 bg-red-100 border-red-200';
+      case 'ÉLEVÉ':
+      case 'ELEVE':
+      case 'T2': return 'text-orange-600 bg-orange-100 border-orange-200';
+      case 'MOYEN':
+      case 'T1': return 'text-yellow-600 bg-yellow-100 border-yellow-200';
+      case 'FAIBLE':
+      case 'T0': return 'text-green-600 bg-green-100 border-green-200';
       default: return 'text-gray-600 bg-gray-100 border-gray-200';
     }
   };
@@ -382,7 +396,7 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">
             {allAlerts.length} alerte(s) affichée(s)
-          </div>
+            </div>
             <button
               onClick={refreshAlerts}
             className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
@@ -412,9 +426,9 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
               Toutes • {stats?.total || 0}
             </button>
             <button
-              onClick={() => handleStatusFilter('NOUVELLE')}
+              onClick={() => handleStatusFilter('pending')}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                selectedStatus === 'NOUVELLE'
+                selectedStatus === 'pending'
                   ? 'bg-red-500 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
@@ -422,9 +436,9 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
               Nouvelles • {stats?.nouvelles || 0}
             </button>
             <button
-              onClick={() => handleStatusFilter('EN_COURS')}
+              onClick={() => handleStatusFilter('acknowledged')}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                selectedStatus === 'EN_COURS'
+                selectedStatus === 'acknowledged'
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
@@ -432,9 +446,9 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
               En cours • {stats?.enCours || 0}
             </button>
             <button
-              onClick={() => handleStatusFilter('TRAITEE')}
+              onClick={() => handleStatusFilter('resolved')}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                selectedStatus === 'TRAITEE'
+                selectedStatus === 'resolved'
                   ? 'bg-green-500 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
@@ -555,34 +569,41 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                   {/* Élève - Largeur fixe */}
                   <div className="flex items-center space-x-3 w-48">
                     <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                      {alert.student.firstName[0]}{alert.student.lastName[0]}
+                      {alert.student?.firstName?.[0] || 'E'}{alert.student?.lastName?.[0] || 'L'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm text-gray-800 truncate">
-                          {alert.student.firstName} {alert.student.lastName}
+                          {alert.student?.firstName || 'Élève'} {alert.student?.lastName || 'Inconnu'}
                       </div>
-                      <div className="text-xs text-gray-500 truncate">{alert.student.className}</div>
-                    </div>
-                  </div>
+                      <div className="text-xs text-gray-500 truncate">{alert.student?.className || 'Classe inconnue'}</div>
+                          </div>
+                      </div>
 
                   {/* Source - Largeur fixe */}
                   <div className="w-24 flex justify-center">
                     <div className="flex items-center justify-center">
-                      <SourceIcon className="w-5 h-5 text-gray-600" />
-                    </div>
-                  </div>
+                      {alert.sourceType === 'chat' ? (
+                        <MessageCircle className="w-5 h-5 text-blue-600" />
+                      ) : (
+                        <BookOpen className="w-5 h-5 text-green-600" />
+                      )}
+                      <span className="ml-1 text-xs text-gray-600">
+                        {alert.sourceLabel || 'Journal'}
+                    </span>
+                        </div>
+                        </div>
 
                   {/* Risque - Largeur fixe */}
                   <div className="w-24 flex justify-center">
-                    <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${getRiskLevelColor(alert.riskLevel)}`}>
-                      {alert.riskLevel}
+                    <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${getRiskLevelColor(alert.riskLevel || alert.level)}`}>
+                      {alert.riskLevel || alert.level || 'T2'}
                     </span>
-                  </div>
+                        </div>
 
                   {/* Résumé - Largeur fixe */}
                   <div className="flex-1 mx-4 min-w-0">
-                    <p className="text-sm text-gray-700 line-clamp-2 truncate">{alert.aiSummary}</p>
-                  </div>
+                    <p className="text-sm text-gray-700 line-clamp-2 truncate">{alert.aiSummary || alert.summary || 'Aucun résumé disponible'}</p>
+                      </div>
 
                   {/* Statut - Largeur fixe */}
                   <div className="w-24 flex justify-center">
@@ -593,7 +614,7 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                     }`}>
                         {getStatusText(alert.status)}
                       </span>
-                  </div>
+                      </div>
 
                   {/* Date - Largeur fixe */}
                   <div className="w-20 text-xs text-gray-600 text-center">
@@ -626,10 +647,10 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                       )}
                   {alert.status === 'TRAITEE' && (
                     <Eye className="w-4 h-4 text-gray-400" />
-                  )}
+                      )}
+                  </div>
                 </div>
               </div>
-            </div>
           );
           }}
         />
@@ -663,7 +684,7 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Expliquez les actions prises ou les raisons du changement de statut..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                rows={4}
+                rows={8}
                 required
               />
             </div>
@@ -734,43 +755,33 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                 <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold border-2 ${getCardColors(selectedAlert.status).badge}`}>
                   {getStatusText(selectedAlert.status)}
                 </span>
+                <span className="px-3 py-1.5 rounded-lg text-sm font-semibold border-2 border-gray-300 bg-gray-100 text-gray-700">
+                  {selectedAlert.sourceLabel || 'Journal'}
+                </span>
               </div>
             </div>
 
             {/* Contenu scrollable */}
             <div className="overflow-y-auto max-h-[calc(90vh-250px)] p-6">
               <div className="space-y-6">
-                {/* Source de l'alerte */}
-                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-5 border-2 border-purple-200">
-                  <h3 className="text-lg font-bold text-purple-900 mb-3 flex items-center">
-                    {(() => {
-                      const sourceInfo = getSourceInfo(selectedAlert.sourceType);
-                      const SourceIcon = sourceInfo.icon;
-                      return (
-                        <>
-                          <SourceIcon className="w-5 h-5 mr-2" />
-                          Source de l'alerte
-                        </>
-                      );
-                    })()}
-                  </h3>
-                  <div className="flex items-center space-x-3">
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getSourceInfo(selectedAlert.sourceType).color}`}>
-                      {getSourceInfo(selectedAlert.sourceType).text}
-                    </span>
-                    <span className="text-purple-700 text-sm">
-                      {getSourceInfo(selectedAlert.sourceType).description}
-                    </span>
-                  </div>
-                </div>
 
                 {/* Analyse IA */}
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border-2 border-blue-200">
                   <h3 className="text-lg font-bold text-blue-900 mb-3 flex items-center">
                     <Brain className="w-5 h-5 mr-2" />
                     Analyse IA
+                    {selectedAlert.triage && (
+                      <span className={`ml-3 px-2 py-1 rounded-lg text-xs font-bold ${
+                        selectedAlert.triage === 'T3' ? 'bg-red-100 text-red-700' :
+                        selectedAlert.triage === 'T2' ? 'bg-orange-100 text-orange-700' :
+                        selectedAlert.triage === 'T1' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-green-100 text-green-700'
+                      }`}>
+                        {selectedAlert.triage}
+                      </span>
+                    )}
                   </h3>
-                  <p className="text-blue-800 leading-relaxed">{selectedAlert.aiSummary}</p>
+                  <p className="text-blue-800 leading-relaxed">{selectedAlert.aiSummary || selectedAlert.summary || 'Aucune analyse disponible'}</p>
                 </div>
 
                 {/* Recommandation */}
@@ -779,27 +790,11 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                     <Shield className="w-5 h-5 mr-2" />
                     Recommandation
                   </h3>
-                  <p className="text-green-800 leading-relaxed">{selectedAlert.aiAdvice}</p>
+                  <p className="text-green-800 leading-relaxed">
+                    {selectedAlert.aiAdvice || selectedAlert.recommendedActions?.join('; ') || 'Aucune recommandation disponible'}
+                  </p>
                 </div>
 
-                {/* Informations élève */}
-                  <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-800 mb-3">Informations élève</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-gray-600">Nom complet :</span>
-                        <span className="text-gray-800">{selectedAlert.student.firstName} {selectedAlert.student.lastName}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-gray-600">Classe :</span>
-                        <span className="text-gray-800">{selectedAlert.student.className}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium text-gray-600">Humeur :</span>
-                        <span className="text-gray-800">{selectedAlert.childMood}</span>
-                    </div>
-                  </div>
-                </div>
 
                 {/* Historique des commentaires */}
                 <div className="bg-white rounded-2xl p-5 border-2 border-gray-200">

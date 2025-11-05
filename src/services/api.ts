@@ -255,22 +255,40 @@ export const studentService = {
 
 export interface Alert {
   id: string;
-  schoolId: string;
-  student: {
+  schoolId?: string;
+  studentId: string;
+  student?: {
     id: string;
     firstName: string;
     lastName: string;
     className: string;
   };
-  sourceId: string;
-  sourceType: string;
+  sourceId?: string;
+  sourceType?: string;
+  sourceLabel?: string;
   createdAt: string;
-  riskLevel: 'FAIBLE' | 'MOYEN' | 'ELEVE' | 'CRITIQUE';
-  riskScore: number;
-  childMood: string;
-  aiSummary: string;
-  aiAdvice: string;
-  status: 'NOUVELLE' | 'EN_COURS' | 'TRAITEE';
+  riskLevel?: 'FAIBLE' | 'MOYEN' | 'ELEVE' | 'CRITIQUE';
+  riskScore?: number;
+  childMood?: string;
+  aiSummary?: string;
+  aiAdvice?: string;
+  status: 'NOUVELLE' | 'EN_COURS' | 'TRAITEE' | 'pending' | 'acknowledged' | 'resolved';
+  statusRaw?: string;
+  // Nouvelles données IA
+  triage?: 'T0' | 'T1' | 'T2' | 'T3';
+  level?: 'T0' | 'T1' | 'T2' | 'T3';
+  summary?: string;
+  schoolName?: string;
+  labels?: string[];
+  evidences?: Array<{ excerpt: string; context: string }>;
+  studentTips?: string[];
+  recommendedActions?: string[];
+  libraryRefs?: Array<{ id: string; title: string; url: string; tags: string[] }>;
+  modelVersion?: string;
+  // Données d'action
+  actedBy?: string;
+  actedAt?: string;
+  notes?: string;
 }
 
 export interface AlertStats {
@@ -297,16 +315,17 @@ export interface AlertComment {
 }
 
 export const alertService = {
-  // Récupérer les alertes de l'établissement (V2: support multi-écoles)
-  getAlerts: async (status?: string, limit?: number, offset?: number, schoolId?: string): Promise<Alert[]> => {
+  // Récupérer les alertes de l'établissement (V2: support multi-écoles + IA)
+  getAlerts: async (status?: string, limit?: number, offset?: number, schoolId?: string, level?: string): Promise<Alert[]> => {
     const params = new URLSearchParams();
     if (schoolId) params.append('schoolId', schoolId); // V2: Passer schoolId explicite
     if (status) params.append('status', status);
+    if (level) params.append('level', level); // Nouveau: filtre par niveau IA (T2, T3)
     if (limit) params.append('limit', limit.toString());
     if (offset) params.append('offset', offset.toString());
     
     const response = await api.get(`/alerts?${params.toString()}`);
-    return response.data;
+    return response.data.data || response.data; // Support du nouveau format avec pagination
   },
 
   // Récupérer une alerte spécifique
@@ -345,6 +364,54 @@ export const alertService = {
   // Récupérer les commentaires d'une alerte
   getAlertComments: async (alertId: string): Promise<AlertComment[]> => {
     const response = await api.get(`/alerts/${alertId}/comments`);
+    return response.data;
+  },
+};
+
+// ===== SERVICES IA =====
+
+export interface RiskAssessment {
+  id: string;
+  studentId: string;
+  subjectType: 'journal' | 'chat';
+  subjectId: string;
+  riskScore: number;
+  labels: string[];
+  triage: 'T0' | 'T1' | 'T2' | 'T3';
+  summary: string;
+  evidences: Array<{ excerpt: string; context: string }>;
+  studentTips: string[];
+  recommendedActions: string[];
+  libraryRefs?: Array<{ id: string; title: string; url: string; tags: string[] }>;
+  modelVersion: string;
+  createdAt: string;
+}
+
+export const aiService = {
+  // Récupérer les analyses de risque d'un élève
+  getStudentRiskAssessments: async (studentId: string, limit?: number, offset?: number): Promise<RiskAssessment[]> => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (offset) params.append('offset', offset.toString());
+    
+    const response = await api.get(`/students/${studentId}/risk-assessments?${params.toString()}`);
+    return response.data;
+  },
+
+  // Récupérer une analyse de risque spécifique
+  getRiskAssessment: async (assessmentId: string): Promise<RiskAssessment> => {
+    const response = await api.get(`/risk-assessments/${assessmentId}`);
+    return response.data;
+  },
+
+  // Récupérer les statistiques de risque d'un élève
+  getStudentRiskStats: async (studentId: string): Promise<{
+    totalAssessments: number;
+    highRiskCount: number;
+    averageRiskScore: number;
+    lastAssessmentDate: string | null;
+  }> => {
+    const response = await api.get(`/students/${studentId}/risk-stats`);
     return response.data;
   },
 };
