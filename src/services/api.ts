@@ -239,6 +239,7 @@ export const studentService = {
   listStudents: async (filters?: {
     className?: string;
     search?: string;
+    schoolId?: string;
   }): Promise<Student[]> => {
     const response = await api.get('/students', { params: filters });
     return response.data;
@@ -349,9 +350,10 @@ export const alertService = {
   },
 
   // Mettre à jour le statut d'une alerte avec un commentaire obligatoire
+  // Accepte les statuts en anglais (pending, acknowledged, resolved) et français (NOUVELLE, EN_COURS, TRAITEE)
   updateAlertStatusWithComment: async (
     alertId: string, 
-    newStatus: 'NOUVELLE' | 'EN_COURS' | 'TRAITEE', 
+    newStatus: 'NOUVELLE' | 'EN_COURS' | 'TRAITEE' | 'pending' | 'acknowledged' | 'resolved', 
     comment: string
   ): Promise<Alert> => {
     const response = await api.patch(`/alerts/${alertId}/status-with-comment`, {

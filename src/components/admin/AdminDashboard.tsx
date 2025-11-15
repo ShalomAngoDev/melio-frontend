@@ -73,8 +73,8 @@ export default function AdminDashboard() {
         {/* Logo & Badge */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center mb-4">
-            <img src={logoIcon} alt="Melio" className="w-8 h-8 mr-3" />
-            <img src={fullLogo} alt="Melio" className="h-6 w-auto" />
+            <img src={logoIcon} alt="Melio" className="w-14 h-14 mr-3" />
+            <img src={fullLogo} alt="Melio" className="h-10 w-auto" />
           </div>
           <div className="bg-melio-pink-light text-melio-purple px-3 py-2 rounded-full text-sm font-medium text-center">
             Administration Melio

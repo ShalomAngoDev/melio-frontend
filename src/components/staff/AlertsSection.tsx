@@ -39,12 +39,19 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
 
   useEffect(() => {
     const initializeData = async () => {
-      await Promise.all([loadAlerts(), loadStats()]);
+      await loadAlerts();
       // Auto-filtrer sur les nouvelles alertes (pending) au chargement
       setSelectedStatus('pending');
     };
     initializeData();
   }, [schoolId]); // Recharger quand on change d'école
+
+  // Recalculer les stats quand les alertes changent
+  useEffect(() => {
+    if (allAlerts && allAlerts.length >= 0) {
+      loadStats();
+    }
+  }, [allAlerts]);
 
   // Effect for filtering and pagination - INSTANTANÉ
   useEffect(() => {
@@ -61,18 +68,64 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
     
     let filtered = [...allAlerts];
     
-    // Filtrer par statut
+    // Filtrer par statut (utiliser statusRaw en priorité, sinon status)
     if (selectedStatus) {
-      filtered = filtered.filter(alert => alert.statusRaw === selectedStatus);
+      filtered = filtered.filter(alert => {
+        const rawStatus = (alert.statusRaw || alert.status || '').toLowerCase();
+        const mappedStatus = (alert.status || '').toUpperCase();
+        
+        // Correspondance avec le statut sélectionné
+        if (selectedStatus === 'pending') {
+          return rawStatus === 'pending';
+        } else if (selectedStatus === 'acknowledged') {
+          return rawStatus === 'acknowledged';
+        } else if (selectedStatus === 'resolved') {
+          return rawStatus === 'resolved';
+        } else if (selectedStatus === 'NOUVELLE') {
+          return rawStatus === 'pending' || mappedStatus === 'NOUVELLE';
+        } else if (selectedStatus === 'EN_COURS') {
+          return rawStatus === 'acknowledged' || mappedStatus === 'EN_COURS';
+        } else if (selectedStatus === 'TRAITEE') {
+          return rawStatus === 'resolved' || mappedStatus === 'TRAITEE';
+        }
+        return false;
+      });
     }
     
     // Filtrer par niveau de risque
     if (selectedRiskLevel) {
-      filtered = filtered.filter(alert => alert.riskLevel === selectedRiskLevel);
+      filtered = filtered.filter(alert => {
+        // Normaliser les accents pour la comparaison
+        const normalize = (str: string) => str
+          .toUpperCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, ''); // Supprimer les accents
+        
+        const riskLevelRaw = alert.riskLevel || '';
+        const levelRaw = alert.level || '';
+        const selectedUpper = normalize(selectedRiskLevel);
+        
+        // Normaliser les deux champs
+        const riskLevelNormalized = normalize(riskLevelRaw);
+        const levelNormalized = normalize(levelRaw);
+        
+        // Mapping des niveaux (anglais: CRITICAL, HIGH, MEDIUM, LOW)
+        if (selectedUpper === 'CRITIQUE' || selectedUpper === 'CRITICAL' || selectedUpper === 'T3') {
+          return riskLevelNormalized === 'CRITICAL' || riskLevelNormalized === 'CRITIQUE' || levelNormalized === 'T3';
+        } else if (selectedUpper === 'ELEVE' || selectedUpper === 'HIGH' || selectedUpper === 'T2') {
+          // Support ancien format (ELEVE/ÉLEVÉ) et nouveau format (HIGH) ou T2
+          return riskLevelNormalized === 'HIGH' || riskLevelNormalized === 'ELEVE' || levelNormalized === 'T2';
+        } else if (selectedUpper === 'MOYEN' || selectedUpper === 'MEDIUM' || selectedUpper === 'T1') {
+          return riskLevelNormalized === 'MEDIUM' || riskLevelNormalized === 'MOYEN' || levelNormalized === 'T1';
+        } else if (selectedUpper === 'FAIBLE' || selectedUpper === 'LOW' || selectedUpper === 'T0') {
+          return riskLevelNormalized === 'LOW' || riskLevelNormalized === 'FAIBLE' || levelNormalized === 'T0';
+        }
+        // Fallback: comparaison exacte
+        return riskLevelNormalized === selectedUpper || levelNormalized === selectedUpper;
+      });
     }
     
     setFilteredAlerts(filtered);
-    
   };
 
   const loadAlerts = async (isInitialLoad = true) => {
@@ -132,8 +185,43 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
 
   const loadStats = async () => {
     try {
-      const data = await alertService.getAlertStats(schoolId); // V2: Passer schoolId
-      setStats(data);
+      // Calculer les stats à partir des alertes réelles chargées
+      // pour utiliser le statut réel (statusRaw) au lieu du statut mappé
+      if (allAlerts && allAlerts.length >= 0) {
+        const statsCalculated = {
+          total: allAlerts.length,
+          nouvelles: allAlerts.filter(a => {
+            const rawStatus = (a.statusRaw || a.status || '').toLowerCase();
+            const mappedStatus = (a.status || '').toUpperCase();
+            return rawStatus === 'pending' || mappedStatus === 'NOUVELLE';
+          }).length,
+          enCours: allAlerts.filter(a => {
+            const rawStatus = (a.statusRaw || a.status || '').toLowerCase();
+            const mappedStatus = (a.status || '').toUpperCase();
+            return rawStatus === 'acknowledged' || mappedStatus === 'EN_COURS';
+          }).length,
+          traitees: allAlerts.filter(a => {
+            const rawStatus = (a.statusRaw || a.status || '').toLowerCase();
+            const mappedStatus = (a.status || '').toUpperCase();
+            return rawStatus === 'resolved' || mappedStatus === 'TRAITEE';
+          }).length,
+          parNiveau: {
+            T2: allAlerts.filter(a => {
+              const level = (a.level || a.riskLevel || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              return level === 'T2' || level === 'HIGH' || level === 'ELEVE';
+            }).length,
+            T3: allAlerts.filter(a => {
+              const level = (a.level || a.riskLevel || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              return level === 'T3' || level === 'CRITICAL' || level === 'CRITIQUE';
+            }).length,
+          }
+        };
+        setStats(statsCalculated);
+      } else {
+        // Si pas d'alertes chargées, utiliser l'API comme fallback
+        const data = await alertService.getAlertStats(schoolId);
+        setStats(data);
+      }
     } catch (err: any) {
       console.error('Failed to load stats:', err);
     }
@@ -141,7 +229,7 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
 
 
 
-  const handleStatusChange = (alertId: string, status: 'NOUVELLE' | 'EN_COURS' | 'TRAITEE') => {
+  const handleStatusChange = (alertId: string, status: 'pending' | 'acknowledged' | 'resolved' | 'NOUVELLE' | 'EN_COURS' | 'TRAITEE') => {
     // Vérifier que l'alerte existe encore
     const alertExists = allAlerts.find(alert => alert.id === alertId);
     if (!alertExists) {
@@ -163,12 +251,33 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
       return;
     }
 
+    // Mapper le statut vers le format API si nécessaire
+    const mapStatusToApi = (status: string): 'pending' | 'acknowledged' | 'resolved' => {
+      const normalized = status.toUpperCase();
+      if (normalized === 'NOUVELLE' || normalized === 'PENDING') return 'pending';
+      if (normalized === 'EN_COURS' || normalized === 'ACKNOWLEDGED') return 'acknowledged';
+      if (normalized === 'TRAITEE' || normalized === 'RESOLVED') return 'resolved';
+      return status as 'pending' | 'acknowledged' | 'resolved';
+    };
+
+    const apiStatus = mapStatusToApi(newStatus);
+
     try {
-      await alertService.updateAlertStatusWithComment(
-        selectedAlertId, 
-        newStatus as 'NOUVELLE' | 'EN_COURS' | 'TRAITEE', 
-        comment
-      );
+      // Le backend attend maintenant les statuts en anglais (pending, acknowledged, resolved)
+      // Mais l'API accepte encore l'ancien format, donc on peut essayer les deux
+      try {
+        await alertService.updateAlertStatusWithComment(selectedAlertId, apiStatus, comment);
+      } catch (e: any) {
+        // Si l'erreur indique que le format n'est pas accepté, essayer l'ancien format
+        if (e.response?.status === 400) {
+          // Mapper vers l'ancien format français pour compatibilité
+          const oldFormatStatus = apiStatus === 'pending' ? 'NOUVELLE' : 
+                                  apiStatus === 'acknowledged' ? 'EN_COURS' : 'TRAITEE';
+          await alertService.updateAlertStatusWithComment(selectedAlertId, oldFormatStatus as any, comment);
+        } else {
+          throw e;
+        }
+      }
       
       // Recharger les données pour s'assurer que tout est synchronisé (sans loading)
       await Promise.all([loadAlerts(false), loadStats()]);
@@ -178,13 +287,8 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
       setNewStatus('');
       setComment('');
       
-      // Notification de succès
-      const statusLabels = {
-        'NOUVELLE': 'Nouvelle',
-        'EN_COURS': 'En cours',
-        'TRAITEE': 'Traitée'
-      };
-      showSuccess(`Alerte marquée comme "${statusLabels[newStatus as keyof typeof statusLabels]}" avec succès`);
+      // Notification de succès avec traduction
+      showSuccess(`Alerte marquée comme "${getStatusText(newStatus)}" avec succès`);
     } catch (err: any) {
       console.error('Failed to update alert status:', err);
       const errorMessage = err.response?.data?.message || 'Erreur lors de la mise à jour';
@@ -202,17 +306,63 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
   const getRiskStats = () => {
     // S'assurer que allAlerts est un tableau
     if (!Array.isArray(allAlerts)) {
-      return { CRITIQUE: 0, ELEVE: 0, MOYEN: 0 };
+      return { CRITIQUE: 0, ELEVE: 0, MOYEN: 0, FAIBLE: 0 };
     }
     
-    const alertsToCount = selectedStatus 
-      ? allAlerts.filter(a => a.statusRaw === selectedStatus)
-      : allAlerts;
+    // Filtrer par statut si sélectionné
+    let alertsToCount = allAlerts;
+    if (selectedStatus) {
+      alertsToCount = allAlerts.filter(a => {
+        const rawStatus = (a.statusRaw || a.status || '').toLowerCase();
+        const mappedStatus = (a.status || '').toUpperCase();
+        
+        if (selectedStatus === 'pending') {
+          return rawStatus === 'pending';
+        } else if (selectedStatus === 'acknowledged') {
+          return rawStatus === 'acknowledged';
+        } else if (selectedStatus === 'resolved') {
+          return rawStatus === 'resolved';
+        } else if (selectedStatus === 'NOUVELLE') {
+          return rawStatus === 'pending' || mappedStatus === 'NOUVELLE';
+        } else if (selectedStatus === 'EN_COURS') {
+          return rawStatus === 'acknowledged' || mappedStatus === 'EN_COURS';
+        } else if (selectedStatus === 'TRAITEE') {
+          return rawStatus === 'resolved' || mappedStatus === 'TRAITEE';
+        }
+        return true;
+      });
+    }
     
+    // Normaliser les accents pour la comparaison
+    const normalize = (str: string) => str
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, ''); // Supprimer les accents
+    
+    // Compter par niveau de risque (anglais: CRITICAL, HIGH, MEDIUM, LOW)
+    // Support aussi ancien format français pour compatibilité
     return {
-      CRITIQUE: alertsToCount.filter(a => a.riskLevel === 'CRITIQUE').length,
-      ELEVE: alertsToCount.filter(a => a.riskLevel === 'ELEVE').length,
-      MOYEN: alertsToCount.filter(a => a.riskLevel === 'MOYEN').length,
+      CRITIQUE: alertsToCount.filter(a => {
+        const riskLevelNorm = normalize(a.riskLevel || '');
+        const levelNorm = normalize(a.level || '');
+        return riskLevelNorm === 'CRITICAL' || riskLevelNorm === 'CRITIQUE' || levelNorm === 'T3';
+      }).length,
+      ELEVE: alertsToCount.filter(a => {
+        const riskLevelNorm = normalize(a.riskLevel || '');
+        const levelNorm = normalize(a.level || '');
+        // Support nouveau format (HIGH) et ancien format (ELEVE/ÉLEVÉ) ou T2
+        return riskLevelNorm === 'HIGH' || riskLevelNorm === 'ELEVE' || levelNorm === 'T2';
+      }).length,
+      MOYEN: alertsToCount.filter(a => {
+        const riskLevelNorm = normalize(a.riskLevel || '');
+        const levelNorm = normalize(a.level || '');
+        return riskLevelNorm === 'MEDIUM' || riskLevelNorm === 'MOYEN' || levelNorm === 'T1';
+      }).length,
+      FAIBLE: alertsToCount.filter(a => {
+        const riskLevelNorm = normalize(a.riskLevel || '');
+        const levelNorm = normalize(a.level || '');
+        return riskLevelNorm === 'LOW' || riskLevelNorm === 'FAIBLE' || levelNorm === 'T0';
+      }).length,
     };
   };
 
@@ -263,15 +413,41 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
     setAlertComments([]);
   };
 
+  // Fonction pour traduire le niveau de risque en français pour l'affichage
+  const translateRiskLevel = (level: string): string => {
+    if (!level) return '';
+    const normalized = level.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    switch (normalized) {
+      case 'CRITICAL':
+      case 'CRITIQUE':
+      case 'T3': return 'Critique';
+      case 'HIGH':
+      case 'ELEVE':
+      case 'T2': return 'Élevé';
+      case 'MEDIUM':
+      case 'MOYEN':
+      case 'T1': return 'Moyen';
+      case 'LOW':
+      case 'FAIBLE':
+      case 'T0': return 'Faible';
+      default: return level;
+    }
+  };
+
   const getRiskLevelColor = (level: string) => {
-    switch (level) {
+    // Normaliser pour gérer anglais et français
+    const normalized = (level || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    switch (normalized) {
+      case 'CRITICAL':
       case 'CRITIQUE':
       case 'T3': return 'text-red-600 bg-red-100 border-red-200';
-      case 'ÉLEVÉ':
+      case 'HIGH':
       case 'ELEVE':
       case 'T2': return 'text-orange-600 bg-orange-100 border-orange-200';
+      case 'MEDIUM':
       case 'MOYEN':
       case 'T1': return 'text-yellow-600 bg-yellow-100 border-yellow-200';
+      case 'LOW':
       case 'FAIBLE':
       case 'T0': return 'text-green-600 bg-green-100 border-green-200';
       default: return 'text-gray-600 bg-gray-100 border-gray-200';
@@ -362,10 +538,16 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
     }
   };
 
+  // Fonction pour traduire le statut en français pour l'affichage
   const getStatusText = (status: string) => {
-    switch (status) {
+    if (!status) return '';
+    const normalized = status.toUpperCase();
+    switch (normalized) {
+      case 'PENDING':
       case 'NOUVELLE': return 'Nouvelle';
+      case 'ACKNOWLEDGED':
       case 'EN_COURS': return 'En cours';
+      case 'RESOLVED':
       case 'TRAITEE': return 'Traitée';
       default: return status;
     }
@@ -461,7 +643,7 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
         {/* Filtre par niveau de risque */}
         <div className="pt-3 border-t border-gray-200">
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
-            Niveau de risque {selectedStatus && <span className="text-gray-400">({selectedStatus})</span>}
+            Niveau de risque {selectedStatus && <span className="text-gray-400">({getStatusText(selectedStatus)})</span>}
           </label>
           <div className="flex items-center space-x-2 flex-wrap gap-y-2">
             <button
@@ -474,42 +656,46 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
             >
               Tous niveaux
             </button>
-            {getRiskStats().CRITIQUE > 0 && (
-              <button
-                onClick={() => setSelectedRiskLevel('CRITIQUE')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  selectedRiskLevel === 'CRITIQUE'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-red-100 text-red-700 hover:bg-red-200'
-                }`}
-              >
-                Critique • {getRiskStats().CRITIQUE}
-              </button>
-            )}
-            {getRiskStats().ELEVE > 0 && (
-              <button
-                onClick={() => setSelectedRiskLevel('ELEVE')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  selectedRiskLevel === 'ELEVE'
-                    ? 'bg-orange-600 text-white'
-                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                }`}
-              >
-                Élevé • {getRiskStats().ELEVE}
-              </button>
-            )}
-            {getRiskStats().MOYEN > 0 && (
-              <button
-                onClick={() => setSelectedRiskLevel('MOYEN')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  selectedRiskLevel === 'MOYEN'
-                    ? 'bg-yellow-600 text-white'
-                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                }`}
-              >
-                Moyen • {getRiskStats().MOYEN}
-              </button>
-            )}
+            <button
+              onClick={() => setSelectedRiskLevel('CRITIQUE')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                selectedRiskLevel === 'CRITIQUE'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-red-100 text-red-700 hover:bg-red-200'
+              }`}
+            >
+              Critique • {getRiskStats().CRITIQUE}
+            </button>
+            <button
+              onClick={() => setSelectedRiskLevel('ELEVE')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                selectedRiskLevel === 'ELEVE'
+                  ? 'bg-orange-600 text-white'
+                  : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+              }`}
+            >
+              Élevé • {getRiskStats().ELEVE}
+            </button>
+            <button
+              onClick={() => setSelectedRiskLevel('MOYEN')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                selectedRiskLevel === 'MOYEN'
+                  ? 'bg-yellow-600 text-white'
+                  : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+              }`}
+            >
+              Moyen • {getRiskStats().MOYEN}
+            </button>
+            <button
+              onClick={() => setSelectedRiskLevel('FAIBLE')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                selectedRiskLevel === 'FAIBLE'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+              }`}
+            >
+              Faible • {getRiskStats().FAIBLE || 0}
+            </button>
           </div>
         </div>
       </div>
@@ -596,7 +782,7 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                   {/* Risque - Largeur fixe */}
                   <div className="w-24 flex justify-center">
                     <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${getRiskLevelColor(alert.riskLevel || alert.level)}`}>
-                      {alert.riskLevel || alert.level || 'T2'}
+                      {translateRiskLevel(alert.riskLevel || alert.level || 'T2')}
                     </span>
                         </div>
 
@@ -608,8 +794,8 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                   {/* Statut - Largeur fixe */}
                   <div className="w-24 flex justify-center">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      alert.status === 'NOUVELLE' ? 'bg-red-100 text-red-700' :
-                      alert.status === 'EN_COURS' ? 'bg-orange-100 text-orange-700' :
+                      (alert.status?.toUpperCase() === 'PENDING' || alert.status === 'NOUVELLE') ? 'bg-red-100 text-red-700' :
+                      (alert.status?.toUpperCase() === 'ACKNOWLEDGED' || alert.status === 'EN_COURS') ? 'bg-orange-100 text-orange-700' :
                       'bg-green-100 text-green-700'
                     }`}>
                         {getStatusText(alert.status)}
@@ -623,29 +809,29 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
 
                   {/* Actions - Largeur fixe */}
                   <div className="w-24 flex justify-center">
-                    {alert.status === 'NOUVELLE' && (
+                    {(alert.status?.toUpperCase() === 'PENDING' || alert.status === 'NOUVELLE') && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleStatusChange(alert.id, 'EN_COURS');
+                          handleStatusChange(alert.id, 'acknowledged');
                         }}
                       className="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-all"
                       >
                       Prendre
                       </button>
                     )}
-                    {alert.status === 'EN_COURS' && (
+                    {(alert.status?.toUpperCase() === 'ACKNOWLEDGED' || alert.status === 'EN_COURS') && (
                         <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleStatusChange(alert.id, 'TRAITEE');
+                          handleStatusChange(alert.id, 'resolved');
                         }}
                       className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-medium transition-all"
                         >
                       Traiter
                         </button>
                       )}
-                  {alert.status === 'TRAITEE' && (
+                  {(alert.status?.toUpperCase() === 'RESOLVED' || alert.status === 'TRAITEE') && (
                     <Eye className="w-4 h-4 text-gray-400" />
                       )}
                   </div>
@@ -750,7 +936,7 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
               {/* Badges de statut */}
               <div className="flex items-center space-x-2">
                 <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold border-2 ${getRiskLevelColor(selectedAlert.riskLevel)}`}>
-                  Niveau {selectedAlert.riskLevel}
+                  Niveau {translateRiskLevel(selectedAlert.riskLevel || selectedAlert.level || '')}
                 </span>
                 <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold border-2 ${getCardColors(selectedAlert.status).badge}`}>
                   {getStatusText(selectedAlert.status)}
@@ -845,8 +1031,8 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                                 </>
                               )}
                               <span className={`text-xs px-2 py-1 rounded font-medium ${
-                                comment.newStatus === 'NOUVELLE' ? 'bg-red-100 text-red-700' :
-                                comment.newStatus === 'EN_COURS' ? 'bg-orange-100 text-orange-700' :
+                                (comment.newStatus?.toUpperCase() === 'PENDING' || comment.newStatus === 'NOUVELLE') ? 'bg-red-100 text-red-700' :
+                                (comment.newStatus?.toUpperCase() === 'ACKNOWLEDGED' || comment.newStatus === 'EN_COURS') ? 'bg-orange-100 text-orange-700' :
                                 'bg-green-100 text-green-700'
                               }`}>
                                 {getStatusText(comment.newStatus)}
@@ -873,11 +1059,11 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                   Fermer
                 </button>
                 
-                {selectedAlert.status === 'NOUVELLE' && (
+                {(selectedAlert.status?.toUpperCase() === 'PENDING' || selectedAlert.status === 'NOUVELLE') && (
                   <button
                     onClick={() => {
                       handleCloseDetailModal();
-                      handleStatusChange(selectedAlert.id, 'EN_COURS');
+                      handleStatusChange(selectedAlert.id, 'acknowledged');
                     }}
                     className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all duration-200 font-medium"
                   >
@@ -885,11 +1071,11 @@ export default function AlertsSection({ onAlertsViewed, schoolId }: AlertsSectio
                   </button>
                 )}
                 
-                {selectedAlert.status === 'EN_COURS' && (
+                {(selectedAlert.status?.toUpperCase() === 'ACKNOWLEDGED' || selectedAlert.status === 'EN_COURS') && (
                   <button
                     onClick={() => {
                       handleCloseDetailModal();
-                      handleStatusChange(selectedAlert.id, 'TRAITEE');
+                      handleStatusChange(selectedAlert.id, 'resolved');
                     }}
                     className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all duration-200 font-medium"
                   >

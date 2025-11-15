@@ -43,11 +43,14 @@ export default function ReportsSection({ schoolId }: ReportsSectionProps) {
   // Effect for filtering - INSTANTANÉ
   useEffect(() => {
     applyFilter();
-  }, [selectedStatus, selectedUrgency, allReports]);
+  }, [selectedStatus, selectedUrgency, allReports, schoolId]);
 
   // Fonction de filtrage
   const applyFilter = () => {
     let filtered = [...allReports];
+
+    // FILTRE DE SÉCURITÉ : S'assurer que tous les signalements appartiennent à l'école sélectionnée
+    filtered = filtered.filter(report => report.schoolId === schoolId);
 
     // Filtrer par statut
     if (selectedStatus) {
@@ -72,12 +75,17 @@ export default function ReportsSection({ schoolId }: ReportsSectionProps) {
         // Recharger les données en arrière-plan sans déclencher les effets
         const data = await reportService.getReports(schoolId, undefined);
         
+        // Filtrer uniquement les signalements de l'école sélectionnée
+        const validData = data.filter(report => report.schoolId === schoolId);
+        
         // Éviter les re-renders inutiles
         setAllReports(prev => {
-          if (JSON.stringify(prev) === JSON.stringify(data)) {
-            return prev;
+          // Vérifier aussi que les anciens signalements appartiennent toujours à cette école
+          const validPrev = prev.filter(r => r.schoolId === schoolId);
+          if (JSON.stringify(validPrev) === JSON.stringify(validData)) {
+            return validPrev;
           }
-          return data;
+          return validData;
         });
         
         const statsData = await reportService.getReportStats(schoolId);
@@ -96,14 +104,24 @@ export default function ReportsSection({ schoolId }: ReportsSectionProps) {
   }, [schoolId]);
 
   const loadReports = async () => {
+    if (!schoolId) {
+      setAllReports([]);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      // Charger TOUS les signalements une seule fois
-      const data = await reportService.getReports(schoolId, undefined); // Utiliser le schoolId de l'utilisateur
-      console.log(`Loaded ${data.length} reports`);
-      setAllReports(data);
+      // VIDER les signalements précédents avant de charger les nouveaux
+      setAllReports([]);
+      
+      // Charger TOUS les signalements une seule fois pour l'école sélectionnée
+      const data = await reportService.getReports(schoolId, undefined);
+      
+      // Filtrer uniquement les signalements de l'école sélectionnée (sécurité supplémentaire)
+      const validData = data.filter(report => report.schoolId === schoolId);
+      setAllReports(validData);
     } catch (err: any) {
       console.error('Failed to load reports:', err);
       setError(err.response?.data?.message || err.message || 'Erreur lors du chargement des signalements');

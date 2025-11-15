@@ -45,14 +45,30 @@ export default function StaffDashboard() {
           return;
         }
         
-        const alerts = await alertService.getAlerts('pending', undefined, undefined, selectedSchoolId);
-        const currentCount = alerts.length;
+        // Récupérer TOUTES les alertes (sans filtre de statut) pour pouvoir filtrer côté client
+        const allAlerts = await alertService.getAlerts(undefined, undefined, undefined, selectedSchoolId);
+        
+        // Filtrer pour ne garder SEULEMENT les nouvelles alertes
+        // Le backend stocke 'pending' dans statusRaw et le mappe en 'NOUVELLE' dans status
+        // On utilise statusRaw pour être sûr d'avoir le statut réel en base de données
+        const newAlertsOnly = allAlerts.filter(alert => {
+          // Utiliser statusRaw en priorité (statut réel en BDD) ou status comme fallback
+          const rawStatus = (alert.statusRaw || alert.status || '').toLowerCase();
+          const mappedStatus = (alert.status || '').toUpperCase();
+          
+          // Nouvelles alertes = 'pending' en BDD (qui est mappé en 'NOUVELLE' par le backend)
+          return rawStatus === 'pending' || mappedStatus === 'NOUVELLE';
+        });
+        const currentCount = newAlertsOnly.length;
+        
+        // Debug: logger le nombre total vs nouvelles
+        console.log(`[StaffDashboard] Total alertes: ${allAlerts.length}, Nouvelles (pending): ${currentCount}`);
         
         // Si l'agent a consulté les alertes et qu'il n'y en a plus de nouvelles, cacher le badge
         if (hasViewedAlerts && currentCount === 0) {
           setNewAlertsCount(0);
         } else {
-          // Sinon, afficher le nombre réel d'alertes "pending"
+          // Sinon, afficher uniquement le nombre de nouvelles alertes
           setNewAlertsCount(currentCount);
           
           // Si de nouvelles alertes arrivent après consultation, réinitialiser l'état "vu"
@@ -152,8 +168,8 @@ export default function StaffDashboard() {
         {/* Logo et Badge */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center mb-4">
-            <img src={logoIcon} alt="Melio" className="w-10 h-10 mr-3" />
-            <img src={fullLogo} alt="Melio" className="h-7 w-auto" />
+            <img src={logoIcon} alt="Melio" className="w-14 h-14 mr-3" />
+            <img src={fullLogo} alt="Melio" className="h-10 w-auto" />
           </div>
           <div className="bg-gray-100 text-gray-900 px-4 py-2 rounded-xl text-sm font-medium text-center">
             Espace Agent Social
@@ -193,9 +209,15 @@ export default function StaffDashboard() {
                   <Building2 className="w-5 h-5 text-gray-600 mr-2" />
                   <div>
                     <div className="font-semibold text-sm text-gray-900">
-                      {user?.schoolName || 'École'}
+                      {user?.schools && user.schools.length === 1 
+                        ? user.schools[0].name 
+                        : user?.schoolName || 'École'}
                     </div>
-                    <div className="text-xs text-gray-600">{user?.schoolCode}</div>
+                    <div className="text-xs text-gray-600">
+                      {user?.schools && user.schools.length === 1 
+                        ? user.schools[0].code 
+                        : user?.schoolCode}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
   Download, 
@@ -11,50 +11,127 @@ import {
   Filter,
   Eye,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  Activity
 } from 'lucide-react';
-import { useAlerts } from '../../contexts/AlertContext';
+import { adminService, statisticsService } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 
-const schoolNames = {
-  'COLLEGE2024': 'Collège Victor Hugo',
-  'LYCEE2024': 'Lycée Jean Moulin'
-};
+interface School {
+  id: string;
+  code: string;
+  name: string;
+}
 
 export default function GlobalReportsSection() {
-  const { getAlertStats } = useAlerts();
-  const [selectedPeriod, setSelectedPeriod] = useState('month');
+  const { showError } = useToast();
+  const [schools, setSchools] = useState<School[]>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
   const [reportType, setReportType] = useState('summary');
-  const [selectedSchools, setSelectedSchools] = useState<string[]>(['COLLEGE2024', 'LYCEE2024']);
+  const [selectedSchools, setSelectedSchools] = useState<string[]>([]);
+  const [globalStats, setGlobalStats] = useState<any>(null);
+  const [schoolStats, setSchoolStats] = useState<Record<string, any>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
-  const globalStats = getAlertStats();
-  const collegeStats = getAlertStats('COLLEGE2024');
-  const lyceeStats = getAlertStats('LYCEE2024');
+  // Charger la liste des écoles
+  useEffect(() => {
+    const loadSchools = async () => {
+      try {
+        setIsLoading(true);
+        const schoolsList = await adminService.getSchools();
+        setSchools(schoolsList);
+        // Sélectionner toutes les écoles par défaut
+        setSelectedSchools(schoolsList.map(s => s.id));
+      } catch (error) {
+        console.error('Erreur lors du chargement des écoles:', error);
+        showError('Erreur lors du chargement des écoles');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSchools();
+  }, []);
+
+  // Charger les statistiques globales quand la période change
+  useEffect(() => {
+    const loadGlobalStats = async () => {
+      try {
+        const stats = await adminService.getGlobalStats(selectedPeriod);
+        setGlobalStats(stats);
+      } catch (error) {
+        console.error('Erreur lors du chargement des statistiques globales:', error);
+        showError('Erreur lors du chargement des statistiques globales');
+      }
+    };
+
+    loadGlobalStats();
+  }, [selectedPeriod]);
+
+  // Charger les statistiques de chaque école sélectionnée
+  useEffect(() => {
+    const loadSchoolStats = async () => {
+      if (selectedSchools.length === 0) return;
+
+      try {
+        const statsPromises = selectedSchools.map(async (schoolId) => {
+          try {
+            const stats = await statisticsService.getGeneralStats(schoolId, selectedPeriod);
+            return { schoolId, stats };
+          } catch (error) {
+            console.error(`Erreur lors du chargement des stats pour l'école ${schoolId}:`, error);
+            return { schoolId, stats: null };
+          }
+        });
+
+        const results = await Promise.all(statsPromises);
+        const statsMap = results.reduce((acc, { schoolId, stats }) => {
+          acc[schoolId] = stats;
+          return acc;
+        }, {} as Record<string, any>);
+
+        setSchoolStats(statsMap);
+      } catch (error) {
+        console.error('Erreur lors du chargement des statistiques des écoles:', error);
+      }
+    };
+
+    loadSchoolStats();
+  }, [selectedSchools, selectedPeriod]);
 
   const generatePDFReport = () => {
-    // Simulation de génération de PDF
+    // Générer le rapport avec les vraies données
     const reportData = {
       type: 'global',
       period: selectedPeriod,
       reportType: reportType,
-      selectedSchools: selectedSchools,
+      selectedSchools: selectedSchools.map(id => {
+        const school = schools.find(s => s.id === id);
+        return { id, code: school?.code, name: school?.name };
+      }),
       globalStats: globalStats,
-      schoolStats: {
-        COLLEGE2024: collegeStats,
-        LYCEE2024: lyceeStats
-      },
+      schoolStats: selectedSchools.reduce((acc, schoolId) => {
+        const school = schools.find(s => s.id === schoolId);
+        if (school && schoolStats[schoolId]) {
+          acc[school.code] = schoolStats[schoolId];
+        }
+        return acc;
+      }, {} as Record<string, any>),
       generatedAt: new Date().toISOString()
     };
 
-    // Créer un faux lien de téléchargement
+    // Créer un lien de téléchargement JSON (en attendant l'implémentation PDF)
     const dataStr = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(reportData, null, 2))}`;
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute('href', dataStr);
-    downloadAnchorNode.setAttribute('download', `melio-rapport-global-${selectedPeriod}-${Date.now()}.json`);
+    const periodLabel = selectedPeriod === 'week' ? 'semaine' : selectedPeriod === 'month' ? 'mois' : 'annee';
+    downloadAnchorNode.setAttribute('download', `melio-rapport-global-${periodLabel}-${Date.now()}.json`);
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
 
-    alert('Rapport global généré ! (Simulation - fichier JSON téléchargé)');
+    alert('Rapport global généré ! (Fichier JSON téléchargé)');
   };
 
   const reportTemplates = [
@@ -88,13 +165,24 @@ export default function GlobalReportsSection() {
     }
   ];
 
-  const toggleSchool = (schoolCode: string) => {
+  const toggleSchool = (schoolId: string) => {
     setSelectedSchools(prev => 
-      prev.includes(schoolCode) 
-        ? prev.filter(s => s !== schoolCode)
-        : [...prev, schoolCode]
+      prev.includes(schoolId) 
+        ? prev.filter(s => s !== schoolId)
+        : [...prev, schoolId]
     );
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center">
+          <Loader2 className="w-8 h-8 animate-spin text-purple-600 mb-4" />
+          <p className="text-gray-600">Chargement des données...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -118,7 +206,6 @@ export default function GlobalReportsSection() {
               {[
                 { id: 'week', label: 'Cette semaine' },
                 { id: 'month', label: 'Ce mois' },
-                { id: 'quarter', label: 'Ce trimestre' },
                 { id: 'year', label: 'Cette année' }
               ].map((period) => (
                 <label key={period.id} className="flex items-center">
@@ -127,7 +214,7 @@ export default function GlobalReportsSection() {
                     name="period"
                     value={period.id}
                     checked={selectedPeriod === period.id}
-                    onChange={(e) => setSelectedPeriod(e.target.value)}
+                    onChange={(e) => setSelectedPeriod(e.target.value as 'week' | 'month' | 'year')}
                     className="mr-3 text-purple-500 focus:ring-purple-500"
                   />
                   <span className="text-gray-700">{period.label}</span>
@@ -141,21 +228,26 @@ export default function GlobalReportsSection() {
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Écoles à inclure
             </label>
-            <div className="space-y-2">
-              {Object.entries(schoolNames).map(([code, name]) => (
-                <label key={code} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={selectedSchools.includes(code)}
-                    onChange={() => toggleSchool(code)}
-                    className="mr-3 text-purple-500 focus:ring-purple-500"
-                  />
-                  <span className="text-gray-700">{name}</span>
-                </label>
-              ))}
+            <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-xl p-3 bg-gray-50">
+              {schools.length === 0 ? (
+                <p className="text-sm text-gray-500">Aucune école disponible</p>
+              ) : (
+                schools.map((school) => (
+                  <label key={school.id} className="flex items-center hover:bg-white px-2 py-1 rounded">
+                    <input
+                      type="checkbox"
+                      checked={selectedSchools.includes(school.id)}
+                      onChange={() => toggleSchool(school.id)}
+                      className="mr-3 text-purple-500 focus:ring-purple-500"
+                    />
+                    <span className="text-gray-700">{school.name}</span>
+                    <span className="text-xs text-gray-500 ml-2">({school.code})</span>
+                  </label>
+                ))
+              )}
             </div>
             <div className="mt-2 text-xs text-gray-500">
-              {selectedSchools.length} école(s) sélectionnée(s)
+              {selectedSchools.length} / {schools.length} école(s) sélectionnée(s)
             </div>
           </div>
 
@@ -216,11 +308,13 @@ export default function GlobalReportsSection() {
               </h3>
               <p className="text-gray-600">
                 Période: {selectedPeriod === 'week' ? 'Cette semaine' : 
-                selectedPeriod === 'month' ? 'Ce mois' : 
-                selectedPeriod === 'quarter' ? 'Ce trimestre' : 'Cette année'}
+                selectedPeriod === 'month' ? 'Ce mois' : 'Cette année'}
               </p>
               <p className="text-sm text-gray-500">
-                Écoles: {selectedSchools.map(code => schoolNames[code as keyof typeof schoolNames]).join(', ')}
+                Écoles: {selectedSchools.map(id => {
+                  const school = schools.find(s => s.id === id);
+                  return school?.name || id;
+                }).join(', ')}
               </p>
               <p className="text-sm text-gray-500">
                 Généré le {new Date().toLocaleDateString('fr-FR')}
@@ -236,20 +330,22 @@ export default function GlobalReportsSection() {
           {/* Global Stats Preview */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-xl p-4 border border-gray-200">
-              <div className="text-2xl font-bold text-gray-800">{globalStats.total}</div>
+              <div className="text-2xl font-bold text-gray-800">{globalStats?.totalAlerts || 0}</div>
               <div className="text-sm text-gray-600">Total alertes</div>
             </div>
             <div className="bg-white rounded-xl p-4 border border-gray-200">
-              <div className="text-2xl font-bold text-green-600">{globalStats.resolved}</div>
+              <div className="text-2xl font-bold text-green-600">{globalStats?.resolvedAlerts || 0}</div>
               <div className="text-sm text-gray-600">Résolues</div>
             </div>
             <div className="bg-white rounded-xl p-4 border border-gray-200">
-              <div className="text-2xl font-bold text-red-600">{globalStats.unresolved}</div>
+              <div className="text-2xl font-bold text-red-600">
+                {(globalStats?.totalAlerts || 0) - (globalStats?.resolvedAlerts || 0)}
+              </div>
               <div className="text-sm text-gray-600">En cours</div>
             </div>
             <div className="bg-white rounded-xl p-4 border border-gray-200">
               <div className="text-2xl font-bold text-blue-600">{selectedSchools.length}</div>
-              <div className="text-sm text-gray-600">Écoles</div>
+              <div className="text-sm text-gray-600">Écoles sélectionnées</div>
             </div>
           </div>
 
@@ -258,31 +354,48 @@ export default function GlobalReportsSection() {
             <div className="space-y-4">
               <h4 className="font-semibold text-gray-800">Comparaison des écoles:</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedSchools.map(schoolCode => {
-                  const stats = schoolCode === 'COLLEGE2024' ? collegeStats : lyceeStats;
+                {selectedSchools.map(schoolId => {
+                  const school = schools.find(s => s.id === schoolId);
+                  const stats = schoolStats[schoolId];
+                  if (!school) return null;
+
                   return (
-                    <div key={schoolCode} className="bg-white rounded-xl p-4 border border-gray-200">
+                    <div key={schoolId} className="bg-white rounded-xl p-4 border border-gray-200">
                       <h5 className="font-medium text-gray-800 mb-2">
-                        {schoolNames[schoolCode as keyof typeof schoolNames]}
+                        {school.name}
                       </h5>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-gray-600">Alertes:</span>
-                          <span className="font-medium">{stats.total}</span>
+                          <span className="font-medium">{stats?.totalAlerts || 0}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Résolues:</span>
-                          <span className="font-medium text-green-600">{stats.resolved}</span>
+                          <span className="font-medium text-green-600">
+                            {stats?.alertsByStatus?.resolved || stats?.alertsByStatus?.TRAITEE || 0}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Critiques:</span>
-                          <span className="font-medium text-red-600">{stats.byRiskLevel.critical || 0}</span>
+                          <span className="font-medium text-red-600">
+                            {stats?.alertsByRiskLevel?.CRITICAL || stats?.alertsByRiskLevel?.CRITIQUE || 0}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Taux:</span>
                           <span className="font-medium">
-                            {stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0}%
+                            {stats?.totalAlerts > 0 
+                              ? Math.round(((stats?.alertsByStatus?.resolved || stats?.alertsByStatus?.TRAITEE || 0) / stats.totalAlerts) * 100) 
+                              : 0}%
                           </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Signalements:</span>
+                          <span className="font-medium">{stats?.totalReports || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Élèves:</span>
+                          <span className="font-medium">{stats?.totalStudents || 0}</span>
                         </div>
                       </div>
                     </div>
@@ -295,14 +408,48 @@ export default function GlobalReportsSection() {
           {reportType === 'detailed' && (
             <div className="space-y-4">
               <h4 className="font-semibold text-gray-800">Analyse détaillée:</h4>
-              <div className="bg-white rounded-xl p-4 border border-gray-200">
-                <h5 className="font-medium text-gray-800 mb-2">Recommandations par école:</h5>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• Collège Victor Hugo: Renforcer la prévention en 6ème</li>
-                  <li>• Lycée Jean Moulin: Améliorer le suivi des alertes moyennes</li>
-                  <li>• Formation continue des équipes pédagogiques</li>
-                </ul>
-              </div>
+              {selectedSchools.map(schoolId => {
+                const school = schools.find(s => s.id === schoolId);
+                const stats = schoolStats[schoolId];
+                if (!school) return null;
+
+                const criticalCount = stats?.alertsByRiskLevel?.CRITICAL || stats?.alertsByRiskLevel?.CRITIQUE || 0;
+                const pendingCount = (stats?.alertsByStatus?.pending || stats?.alertsByStatus?.NOUVELLE || 0) + 
+                                    (stats?.alertsByStatus?.acknowledged || stats?.alertsByStatus?.EN_COURS || 0);
+                const resolutionRate = stats?.totalAlerts > 0 
+                  ? Math.round(((stats?.alertsByStatus?.resolved || stats?.alertsByStatus?.TRAITEE || 0) / stats.totalAlerts) * 100)
+                  : 0;
+
+                return (
+                  <div key={schoolId} className="bg-white rounded-xl p-4 border border-gray-200">
+                    <h5 className="font-medium text-gray-800 mb-3">{school.name}</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
+                      <div>
+                        <span className="text-gray-600">Alertes totales:</span>
+                        <span className="font-medium ml-2">{stats?.totalAlerts || 0}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">En attente:</span>
+                        <span className="font-medium ml-2 text-orange-600">{pendingCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Critiques:</span>
+                        <span className="font-medium ml-2 text-red-600">{criticalCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Taux résolution:</span>
+                        <span className="font-medium ml-2">{resolutionRate}%</span>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-2">
+                      {criticalCount > 0 && `⚠️ ${criticalCount} alerte(s) critique(s) nécessite(nt) une attention prioritaire. `}
+                      {pendingCount > 10 && `📊 ${pendingCount} alerte(s) en attente de traitement. `}
+                      {resolutionRate < 70 && `📉 Taux de résolution à améliorer (objectif: 80%).`}
+                      {criticalCount === 0 && pendingCount <= 10 && resolutionRate >= 70 && `✅ Performance conforme.`}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -310,14 +457,39 @@ export default function GlobalReportsSection() {
             <div className="space-y-4">
               <h4 className="font-semibold text-gray-800">Tendances observées:</h4>
               <div className="bg-white rounded-xl p-4 border border-gray-200">
-                <div className="flex items-center mb-2">
-                  <TrendingUp className="w-4 h-4 text-green-500 mr-2" />
-                  <span className="text-sm font-medium text-gray-800">Évolution positive</span>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <Activity className="w-4 h-4 text-blue-500 mr-2" />
+                      <span className="text-sm font-medium text-gray-800">Vue d'ensemble</span>
+                    </div>
+                    <p className="text-sm text-gray-700">
+                      {globalStats?.totalAlerts || 0} alerte(s) totale(s) sur la période sélectionnée.
+                      {globalStats?.resolvedAlerts > 0 && (
+                        <span> {globalStats.resolvedAlerts} résolue(s) (taux de résolution: {globalStats?.totalAlerts > 0 ? Math.round((globalStats.resolvedAlerts / globalStats.totalAlerts) * 100) : 0}%).</span>
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
+                      <span className="text-sm font-medium text-gray-800">Alertes critiques</span>
+                    </div>
+                    <p className="text-sm text-gray-700">
+                      {globalStats?.criticalAlerts || 0} alerte(s) critique(s) identifiée(s).
+                      {selectedSchools.length > 0 && ' Données consolidées pour les écoles sélectionnées.'}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <School className="w-4 h-4 text-indigo-500 mr-2" />
+                      <span className="text-sm font-medium text-gray-800">Couverture</span>
+                    </div>
+                    <p className="text-sm text-gray-700">
+                      Analyse portant sur {selectedSchools.length} école(s) sur un total de {schools.length} école(s) dans le système.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-700">
-                  Le taux de résolution global s'améliore (+15% ce mois). 
-                  Les alertes critiques diminuent dans toutes les écoles.
-                </p>
               </div>
             </div>
           )}

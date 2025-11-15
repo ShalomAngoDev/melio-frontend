@@ -21,7 +21,7 @@ import {
   BarChart3,
   GraduationCap
 } from 'lucide-react';
-import { adminService } from '../../services/api';
+import { adminService, statisticsService, alertService, reportService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import SchoolStudentsManagement from './SchoolStudentsManagement';
 
@@ -62,6 +62,9 @@ interface SchoolStats {
   totalReports: number;
   alertsByRiskLevel?: { [key: string]: number };
   reportsByStatus?: { [key: string]: number };
+  alertsByStatus?: { [key: string]: number };
+  averageResponseTime?: number | null; // en heures
+  criticalPendingCount?: number; // Nombre d'alertes critiques non traitées
 }
 
 export default function SchoolDetails({ schoolId, onBack, onUpdate }: SchoolDetailsProps) {
@@ -132,12 +135,99 @@ export default function SchoolDetails({ schoolId, onBack, onUpdate }: SchoolDeta
         status: data.status,
       });
 
-      // Charger les statistiques
+      // Charger les statistiques spécifiques à cette école uniquement
       try {
-        const statsData = await adminService.getSchoolStats(schoolId);
-        setStats(statsData);
+        // Charger les statistiques générales de l'école (utilise getGeneralStats qui filtre par schoolId)
+        const generalStats = await statisticsService.getGeneralStats(schoolId);
+        
+        // Charger toutes les alertes ET signalements de cette école uniquement
+        const [allAlerts, allReports] = await Promise.all([
+          alertService.getAlerts(undefined, 1000, 0, schoolId).catch(() => []),
+          reportService.getReports(schoolId).catch(() => [])
+        ]);
+        
+        // FILTRER strictement par schoolId côté client pour sécurité supplémentaire
+        const schoolAlerts = allAlerts.filter((a: any) => {
+          // Vérifier que l'alerte appartient bien à cette école
+          if (a.schoolId && a.schoolId !== schoolId) return false;
+          // Vérifier via studentId si disponible
+          if (a.student && a.student.schoolId && a.student.schoolId !== schoolId) return false;
+          return true;
+        });
+        
+        const schoolReports = allReports.filter((r: any) => {
+          // Vérifier que le signalement appartient bien à cette école
+          return r.schoolId === schoolId;
+        });
+        
+        // Identifier les alertes non traitées (pending ou acknowledged)
+        const pendingOrAcknowledgedAlerts = schoolAlerts.filter((a: any) => {
+          const rawStatus = (a.statusRaw || a.status || '').toLowerCase();
+          const mappedStatus = (a.status || '').toUpperCase();
+          return rawStatus === 'pending' || 
+                 rawStatus === 'acknowledged' || 
+                 mappedStatus === 'NOUVELLE' || 
+                 mappedStatus === 'EN_COURS';
+        });
+        
+        // Identifier les alertes critiques non traitées
+        const criticalPendingAlerts = pendingOrAcknowledgedAlerts.filter((a: any) => {
+          const riskLevel = (a.riskLevel || a.level || '').toUpperCase();
+          const normalizedRiskLevel = riskLevel.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          return normalizedRiskLevel === 'CRITICAL' || 
+                 normalizedRiskLevel === 'CRITIQUE' || 
+                 riskLevel === 'T3';
+        });
+        
+        // Calculer le temps de réponse moyen UNIQUEMENT pour les alertes résolues de cette école
+        const resolvedAlerts = schoolAlerts.filter((a: any) => 
+          a.statusRaw === 'resolved' || a.status === 'TRAITEE' || a.status === 'RESOLVED'
+        );
+        
+        let totalResponseTime = 0;
+        let resolvedWithTimes = 0;
+        
+        resolvedAlerts.forEach((alert: any) => {
+          if (alert.createdAt && alert.updatedAt) {
+            const createdAt = new Date(alert.createdAt);
+            const updatedAt = new Date(alert.updatedAt);
+            const diffHours = (updatedAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
+            if (diffHours > 0 && diffHours < 720) { // Max 30 jours pour éviter les aberrations
+              totalResponseTime += diffHours;
+              resolvedWithTimes++;
+            }
+          }
+        });
+        
+        const averageResponseTime = resolvedWithTimes > 0 
+          ? Math.round(totalResponseTime / resolvedWithTimes) 
+          : null;
+        
+        // Utiliser uniquement les données de generalStats (qui sont déjà filtrées par schoolId)
+        // et ajouter le temps de réponse moyen calculé ainsi que le nombre de critiques non traitées
+        setStats({
+          totalStudents: generalStats.totalStudents || 0,
+          totalAlerts: generalStats.totalAlerts || 0,
+          totalReports: generalStats.totalReports || 0,
+          alertsByStatus: generalStats.alertsByStatus || {},
+          reportsByStatus: generalStats.reportsByStatus || {},
+          alertsByRiskLevel: generalStats.alertsByRiskLevel || {},
+          averageResponseTime,
+          criticalPendingCount: criticalPendingAlerts.length // Nombre de critiques non traitées uniquement
+        });
       } catch (error) {
         console.error('Erreur stats:', error);
+        // En cas d'erreur, initialiser avec des valeurs vides
+        setStats({
+          totalStudents: 0,
+          totalAlerts: 0,
+          totalReports: 0,
+          alertsByStatus: {},
+          reportsByStatus: {},
+          alertsByRiskLevel: {},
+          averageResponseTime: null,
+          criticalPendingCount: 0
+        });
       }
 
       // Charger les agents de l'école
@@ -354,13 +444,14 @@ export default function SchoolDetails({ schoolId, onBack, onUpdate }: SchoolDeta
               </span>
             </div>
             <div className="text-3xl font-bold text-orange-600 mb-1">
-              {stats ? (stats.alertsByStatus?.NOUVELLE || 0) + (stats.alertsByStatus?.EN_COURS || 0) : '-'}
+              {stats ? (stats.alertsByStatus?.pending || stats.alertsByStatus?.NOUVELLE || 0) + 
+                      (stats.alertsByStatus?.acknowledged || stats.alertsByStatus?.EN_COURS || 0) : '-'}
             </div>
             <div className="text-xs text-orange-700">Alertes non traitées</div>
-            {stats && stats.alertsByRiskLevel?.CRITIQUE > 0 && (
+            {stats && (stats.criticalPendingCount || 0) > 0 && (
               <div className="mt-2 text-xs font-semibold text-red-600 flex items-center">
                 <AlertCircle className="w-3 h-3 mr-1" />
-                {stats.alertsByRiskLevel.CRITIQUE} critique(s)
+                {stats.criticalPendingCount} critique(s) non traitée(s)
               </div>
             )}
           </div>
@@ -374,7 +465,8 @@ export default function SchoolDetails({ schoolId, onBack, onUpdate }: SchoolDeta
               </span>
             </div>
             <div className="text-3xl font-bold text-purple-600 mb-1">
-              {stats ? (stats.reportsByStatus?.NOUVEAU || 0) + (stats.reportsByStatus?.EN_COURS || 0) : '-'}
+              {stats ? (stats.reportsByStatus?.NOUVEAU || 0) + 
+                      (stats.reportsByStatus?.EN_COURS || 0) : '-'}
             </div>
             <div className="text-xs text-purple-700">Signalements en cours</div>
           </div>
@@ -389,12 +481,12 @@ export default function SchoolDetails({ schoolId, onBack, onUpdate }: SchoolDeta
             </div>
             <div className="text-3xl font-bold text-green-600 mb-1">
               {stats && stats.totalAlerts > 0 
-                ? Math.round(((stats.alertsByStatus?.TRAITEE || 0) / stats.totalAlerts) * 100)
+                ? Math.round(((stats.alertsByStatus?.resolved || stats.alertsByStatus?.TRAITEE || 0) / stats.totalAlerts) * 100)
                 : 0}%
             </div>
             <div className="text-xs text-green-700">Taux de résolution</div>
             <div className="mt-2 text-xs text-gray-600">
-              {stats?.alertsByStatus?.TRAITEE || 0} / {stats?.totalAlerts || 0} résolues
+              {stats ? (stats.alertsByStatus?.resolved || stats.alertsByStatus?.TRAITEE || 0) : 0} / {stats?.totalAlerts || 0} résolues
             </div>
           </div>
 
@@ -428,13 +520,21 @@ export default function SchoolDetails({ schoolId, onBack, onUpdate }: SchoolDeta
             </div>
             <div className="flex items-center">
               <div className="flex-1">
-                <div className="text-2xl font-bold text-gray-800">~24h</div>
-                <div className="text-xs text-gray-600">Temps de réponse</div>
+                <div className="text-2xl font-bold text-gray-800">
+                  {stats?.averageResponseTime !== null && stats?.averageResponseTime !== undefined
+                    ? stats.averageResponseTime < 24
+                      ? `~${stats.averageResponseTime}h`
+                      : `~${Math.round(stats.averageResponseTime / 24)}j`
+                    : '-'}
+                </div>
+                <div className="text-xs text-gray-600">Temps de réponse moyen</div>
               </div>
               <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                true ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                stats?.averageResponseTime !== null && stats?.averageResponseTime !== undefined && stats.averageResponseTime <= 48
+                  ? 'bg-green-100 text-green-700' 
+                  : 'bg-orange-100 text-orange-700'
               }`}>
-                Bon
+                {stats?.averageResponseTime !== null && stats?.averageResponseTime !== undefined && stats.averageResponseTime <= 48 ? 'Bon' : 'À améliorer'}
               </div>
             </div>
           </div>

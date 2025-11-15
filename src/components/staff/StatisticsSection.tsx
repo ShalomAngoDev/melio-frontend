@@ -306,10 +306,10 @@ export default function StatisticsSection({ schoolId }: StatisticsSectionProps) 
           
           <div className="space-y-4">
             {[
-              { level: 'critical', label: 'Critique', count: generalStats?.alertsByRiskLevel?.CRITIQUE || 0, color: 'bg-red-500' },
-              { level: 'high', label: 'Élevé', count: generalStats?.alertsByRiskLevel?.ELEVE || 0, color: 'bg-orange-500' },
-              { level: 'medium', label: 'Moyen', count: generalStats?.alertsByRiskLevel?.MOYEN || 0, color: 'bg-yellow-500' },
-              { level: 'low', label: 'Faible', count: generalStats?.alertsByRiskLevel?.FAIBLE || 0, color: 'bg-blue-500' }
+              { level: 'critical', label: 'Critique', count: (generalStats?.alertsByRiskLevel?.CRITICAL || generalStats?.alertsByRiskLevel?.CRITIQUE || 0), color: 'bg-red-500' },
+              { level: 'high', label: 'Élevé', count: (generalStats?.alertsByRiskLevel?.HIGH || generalStats?.alertsByRiskLevel?.ELEVE || 0), color: 'bg-orange-500' },
+              { level: 'medium', label: 'Moyen', count: (generalStats?.alertsByRiskLevel?.MEDIUM || generalStats?.alertsByRiskLevel?.MOYEN || 0), color: 'bg-yellow-500' },
+              { level: 'low', label: 'Faible', count: (generalStats?.alertsByRiskLevel?.LOW || generalStats?.alertsByRiskLevel?.FAIBLE || 0), color: 'bg-blue-500' }
             ].map((item) => {
               const total = generalStats?.totalAlerts || 0;
               const percentage = total > 0 ? (item.count / total) * 100 : 0;

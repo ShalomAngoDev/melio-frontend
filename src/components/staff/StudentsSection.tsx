@@ -47,9 +47,12 @@ export default function StudentsSection({ schoolId, schoolName, schoolCode }: St
   }, [students, searchTerm, selectedClass]);
 
   const loadStudents = async () => {
+    if (!schoolId) return;
+    
     try {
       setIsLoading(true);
-      const data = await studentService.listStudents({});
+      // Passer le schoolId sélectionné pour filtrer par école
+      const data = await studentService.listStudents({ schoolId });
       setStudents(data);
       
       // Extraire les classes uniques

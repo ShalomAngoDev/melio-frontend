@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, Users, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { fullLogo } from '../../assets/images';
+import { logoWith } from '../../assets/images';
 import { useToast } from '../../contexts/ToastContext';
 import { handleAuthError } from '../../utils/auth-error-handler';
 import PrivacyPolicy from '../PrivacyPolicy';
@@ -81,16 +81,13 @@ export default function UnifiedLoginScreen() {
           {/* Left Side - Branding */}
           <div className="text-center lg:text-left text-white">
             <div className="mb-8">
-              <img src={fullLogo} alt="Melio" className="h-20 w-auto mx-auto lg:mx-0 mb-6" />
+              <img src={logoWith} alt="Melio" className="h-32 lg:h-40 w-auto mx-auto lg:mx-0 mb-6" />
               <h1 className="text-5xl lg:text-6xl font-bold mb-6">
-                Bienvenue sur
+                <span className="text-white/90">Bienvenue sur</span>
                 <span 
-                  className="block"
+                  className="block text-white drop-shadow-lg"
                   style={{
-                    background: 'linear-gradient(135deg, #9b5de0, #e89fac)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text'
+                    textShadow: '2px 2px 8px rgba(0, 0, 0, 0.5), 0 0 20px rgba(155, 93, 224, 0.5)'
                   }}
                 >
                   Melio

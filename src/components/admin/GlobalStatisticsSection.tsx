@@ -237,17 +237,17 @@ export default function GlobalStatisticsSection() {
       id: school.id,
       stats: stats ? {
         total: stats.totalAlerts || 0,
-        critical: stats.alertsByRiskLevel?.CRITIQUE || 0,
-        high: stats.alertsByRiskLevel?.ELEVE || 0,
-        medium: stats.alertsByRiskLevel?.MOYEN || 0,
-        low: stats.alertsByRiskLevel?.FAIBLE || 0,
+        critical: stats.alertsByRiskLevel?.CRITICAL || stats.alertsByRiskLevel?.CRITIQUE || 0,
+        high: stats.alertsByRiskLevel?.HIGH || stats.alertsByRiskLevel?.ELEVE || 0,
+        medium: stats.alertsByRiskLevel?.MEDIUM || stats.alertsByRiskLevel?.MOYEN || 0,
+        low: stats.alertsByRiskLevel?.LOW || stats.alertsByRiskLevel?.FAIBLE || 0,
         resolved: stats.alertsByStatus?.TRAITEE || 0,
         totalReports: stats.totalReports || 0,
         byRiskLevel: {
-          critical: stats.alertsByRiskLevel?.CRITIQUE || 0,
-          high: stats.alertsByRiskLevel?.ELEVE || 0,
-          medium: stats.alertsByRiskLevel?.MOYEN || 0,
-          low: stats.alertsByRiskLevel?.FAIBLE || 0
+          critical: stats.alertsByRiskLevel?.CRITICAL || stats.alertsByRiskLevel?.CRITIQUE || 0,
+          high: stats.alertsByRiskLevel?.HIGH || stats.alertsByRiskLevel?.ELEVE || 0,
+          medium: stats.alertsByRiskLevel?.MEDIUM || stats.alertsByRiskLevel?.MOYEN || 0,
+          low: stats.alertsByRiskLevel?.LOW || stats.alertsByRiskLevel?.FAIBLE || 0
         }
       } : {
         total: 0,
@@ -300,6 +300,11 @@ export default function GlobalStatisticsSection() {
         totalReports: school.stats?.totalReports || 0,
         criticalAlerts: school.stats?.byRiskLevel?.critical || 0,
         alertsByRiskLevel: {
+          CRITICAL: school.stats?.byRiskLevel?.critical || 0,
+          HIGH: school.stats?.byRiskLevel?.high || 0,
+          MEDIUM: school.stats?.byRiskLevel?.medium || 0,
+          LOW: school.stats?.byRiskLevel?.low || 0,
+          // Support ancien format pour compatibilité
           CRITIQUE: school.stats?.byRiskLevel?.critical || 0,
           ELEVE: school.stats?.byRiskLevel?.high || 0,
           MOYEN: school.stats?.byRiskLevel?.medium || 0,
@@ -558,10 +563,10 @@ export default function GlobalStatisticsSection() {
           
           <div className="space-y-4">
             {[
-              { level: 'critical', label: 'Critique', count: filteredStats?.alertsByRiskLevel?.CRITIQUE || 0, color: 'bg-red-500' },
-              { level: 'high', label: 'Élevé', count: filteredStats?.alertsByRiskLevel?.ELEVE || 0, color: 'bg-orange-500' },
-              { level: 'medium', label: 'Moyen', count: filteredStats?.alertsByRiskLevel?.MOYEN || 0, color: 'bg-yellow-500' },
-              { level: 'low', label: 'Faible', count: filteredStats?.alertsByRiskLevel?.FAIBLE || 0, color: 'bg-blue-500' }
+              { level: 'critical', label: 'Critique', count: (filteredStats?.alertsByRiskLevel?.CRITICAL || filteredStats?.alertsByRiskLevel?.CRITIQUE || 0), color: 'bg-red-500' },
+              { level: 'high', label: 'Élevé', count: (filteredStats?.alertsByRiskLevel?.HIGH || filteredStats?.alertsByRiskLevel?.ELEVE || 0), color: 'bg-orange-500' },
+              { level: 'medium', label: 'Moyen', count: (filteredStats?.alertsByRiskLevel?.MEDIUM || filteredStats?.alertsByRiskLevel?.MOYEN || 0), color: 'bg-yellow-500' },
+              { level: 'low', label: 'Faible', count: (filteredStats?.alertsByRiskLevel?.LOW || filteredStats?.alertsByRiskLevel?.FAIBLE || 0), color: 'bg-blue-500' }
             ].map((item) => {
               const total = filteredStats?.totalAlerts || 0;
               const percentage = total > 0 ? (item.count / total) * 100 : 0;

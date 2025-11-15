@@ -117,20 +117,20 @@ export default function SchoolReportsSection({ schoolId }: SchoolReportsSectionP
 
   useEffect(() => {
     loadReportData();
-  }, [selectedPeriod]);
+  }, [selectedPeriod, schoolId]);
 
   const loadReportData = async () => {
-    if (!user?.schoolId) return;
+    if (!schoolId) return;
     
     setIsLoading(true);
     try {
-      // Charger les données en parallèle
-      const [generalStats, temporalStats, classStats, trends] = await Promise.all([
-        statisticsService.getGeneralStats(user.schoolId),
-        statisticsService.getTemporalStats(user.schoolId, 'month'),
-        statisticsService.getClassStats(user.schoolId),
-        statisticsService.getTrends(user.schoolId)
-      ]);
+        // Charger les données en parallèle
+        const [generalStats, temporalStats, classStats, trends] = await Promise.all([
+          statisticsService.getGeneralStats(schoolId),
+          statisticsService.getTemporalStats(schoolId, 'month'),
+          statisticsService.getClassStats(schoolId),
+          statisticsService.getTrends(schoolId)
+        ]);
 
       // Calculer les tendances pour la période sélectionnée
       const periodDays = selectedPeriod === '7d' ? 7 : selectedPeriod === '30d' ? 30 : selectedPeriod === '90d' ? 90 : 365;
