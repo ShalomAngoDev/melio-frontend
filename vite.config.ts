@@ -22,7 +22,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5174,  // Port personnalisé pour l'application web
+    port: 5173,  // Port personnalisé pour l'application web
     host: true,
   },
   publicDir: 'public',

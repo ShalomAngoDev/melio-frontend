@@ -66,13 +66,13 @@ export default function UnifiedLoginScreen() {
       ></div>
       
       {/* Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-900/70 via-purple-900/60 to-indigo-900/70"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-melio-purple/70 via-melio-purple-light/60 to-melio-pink/70"></div>
       
       {/* Background Pattern */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-200/20 to-purple-300/20 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-purple-200/20 to-indigo-300/20 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-blue-100/10 to-purple-100/10 rounded-full blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-melio-purple-light/20 to-melio-pink/20 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-melio-purple/20 to-melio-pink-light/20 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-melio-pink-light/10 to-melio-purple-light/10 rounded-full blur-3xl"></div>
       </div>
 
       {/* Main Content */}
@@ -87,7 +87,7 @@ export default function UnifiedLoginScreen() {
                 <span 
                   className="block"
                   style={{
-                    background: 'linear-gradient(135deg, #895cf1, #d8268d)',
+                    background: 'linear-gradient(135deg, #9b5de0, #e89fac)',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text'
@@ -96,15 +96,15 @@ export default function UnifiedLoginScreen() {
                   Melio
                 </span>
               </h1>
-              <p className="text-xl text-blue-100 mb-8 max-w-lg mx-auto lg:mx-0 leading-relaxed">
+              <p className="text-xl text-white/90 mb-8 max-w-lg mx-auto lg:mx-0 leading-relaxed">
                 Plateforme sécurisée pour l'accompagnement des jeunes en milieu scolaire
               </p>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto lg:mx-0">
               <div className="relative flex items-center space-x-3 p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/60 overflow-hidden group">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-blue-300/40 to-transparent transform -skew-x-12 -translate-x-full animate-[light-sweep_3s_ease-in-out_infinite]"></div>
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500/50 to-indigo-600/50 rounded-xl flex items-center justify-center relative z-10">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-melio-purple/40 to-transparent transform -skew-x-12 -translate-x-full animate-[light-sweep_3s_ease-in-out_infinite]"></div>
+                <div className="w-12 h-12 bg-gradient-to-br from-melio-purple/50 to-melio-purple-light/50 rounded-xl flex items-center justify-center relative z-10">
                   <Shield className="w-6 h-6 text-white" />
                 </div>
                 <div className="relative z-10">
@@ -113,8 +113,8 @@ export default function UnifiedLoginScreen() {
                 </div>
               </div>
               <div className="relative flex items-center space-x-3 p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/60 overflow-hidden group">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-purple-300/50 to-transparent transform -skew-x-12 -translate-x-full animate-[light-sweep_3s_ease-in-out_infinite_1.5s]"></div>
-                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500/50 to-purple-600/50 rounded-xl flex items-center justify-center relative z-10">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-melio-pink/50 to-transparent transform -skew-x-12 -translate-x-full animate-[light-sweep_3s_ease-in-out_infinite_1.5s]"></div>
+                <div className="w-12 h-12 bg-gradient-to-br from-melio-pink/50 to-melio-purple-light/50 rounded-xl flex items-center justify-center relative z-10">
                   <Users className="w-6 h-6 text-white" />
                 </div>
                 <div className="relative z-10">
@@ -144,7 +144,7 @@ export default function UnifiedLoginScreen() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-melio-purple focus:border-transparent transition-all duration-200 bg-white/50"
                       placeholder="votre.email@example.com"
                       disabled={isLoading}
                       autoComplete="email"
@@ -162,7 +162,7 @@ export default function UnifiedLoginScreen() {
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
+                        className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 focus:ring-2 focus:ring-melio-purple focus:border-transparent transition-all duration-200 bg-white/50"
                         placeholder="Votre mot de passe"
                         disabled={isLoading}
                         autoComplete="current-password"
@@ -187,7 +187,7 @@ export default function UnifiedLoginScreen() {
                   <button
                     type="submit"
                     disabled={isLoading || !email.trim() || !password.trim()}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 focus:ring-4 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
+                    className="w-full py-3 px-4 bg-gradient-to-r from-melio-purple to-melio-pink text-white rounded-xl font-medium hover:from-melio-purple/90 hover:to-melio-pink/90 focus:ring-4 focus:ring-melio-purple-light disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
                   >
                     {isLoading ? 'Connexion...' : 'Se connecter'}
                   </button>
@@ -197,7 +197,7 @@ export default function UnifiedLoginScreen() {
                 <div className="mt-3 text-center">
                   <p className="text-sm text-gray-600">
                     Identifiants oubliés ? Contactez-le{' '}
-                    <a href="tel:+33745697503" className="text-blue-600 hover:text-blue-800 font-medium">
+                    <a href="tel:+33745697503" className="text-melio-purple hover:text-melio-purple-light font-medium">
                       +33 0745697503
                     </a>
                   </p>
@@ -222,14 +222,14 @@ export default function UnifiedLoginScreen() {
                   <span>•</span>
                   <button 
                     onClick={() => setShowPrivacyPolicy(true)}
-                    className="text-blue-600 hover:text-blue-800 transition-colors duration-200"
+                    className="text-melio-purple hover:text-melio-purple-light transition-colors duration-200"
                   >
                     Confidentialité
                   </button>
                   <span>•</span>
                   <button 
                     onClick={() => setShowTermsOfService(true)}
-                    className="text-blue-600 hover:text-blue-800 transition-colors duration-200"
+                    className="text-melio-purple hover:text-melio-purple-light transition-colors duration-200"
                   >
                     Conditions
                   </button>

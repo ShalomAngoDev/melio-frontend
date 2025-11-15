@@ -67,16 +67,16 @@ export default function AdminDashboard() {
   }, []);
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 overflow-hidden">
+    <div className="flex h-screen bg-white overflow-hidden">
       {/* Sidebar - Fixe à gauche, pleine hauteur */}
-      <aside className="w-72 bg-white/80 backdrop-blur-sm border-r border-white/20 flex flex-col shadow-lg">
+      <aside className="w-72 bg-white border-r border-gray-200 flex flex-col shadow-sm">
         {/* Logo & Badge */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center mb-4">
             <img src={logoIcon} alt="Melio" className="w-8 h-8 mr-3" />
             <img src={fullLogo} alt="Melio" className="h-6 w-auto" />
           </div>
-          <div className="bg-purple-100 text-purple-800 px-3 py-2 rounded-full text-sm font-medium text-center">
+          <div className="bg-melio-pink-light text-melio-purple px-3 py-2 rounded-full text-sm font-medium text-center">
             Administration Melio
           </div>
         </div>
@@ -108,12 +108,12 @@ export default function AdminDashboard() {
 
         {/* User Info - En bas de la sidebar */}
         <div className="p-4 border-t border-gray-200">
-          <div className="bg-purple-50 rounded-xl p-3 mb-3 border border-purple-200">
+          <div className="bg-melio-pink-light rounded-xl p-3 mb-3 border border-melio-purple-light">
             <div className="flex items-center mb-1">
-              <Shield className="w-4 h-4 text-purple-600 mr-2" />
-              <span className="text-xs font-medium text-purple-800">Administrateur</span>
+              <Shield className="w-4 h-4 text-melio-purple mr-2" />
+              <span className="text-xs font-medium text-melio-purple">Administrateur</span>
             </div>
-            <p className="text-xs text-purple-700">{user?.email}</p>
+            <p className="text-xs text-melio-purple-light">{user?.email}</p>
           </div>
           <button
             onClick={logout}
@@ -128,7 +128,7 @@ export default function AdminDashboard() {
       {/* Main Content - Utilise tout l'espace restant */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
-        <header className="bg-white/60 backdrop-blur-sm border-b border-white/20 px-8 py-4 flex-shrink-0">
+        <header className="bg-white border-b border-gray-200 px-8 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">
@@ -152,7 +152,7 @@ export default function AdminDashboard() {
           {isLoading && (
             <div className="flex items-center justify-center h-full">
               <div className="flex flex-col items-center">
-                <Loader2 className="w-8 h-8 animate-spin text-purple-600 mb-4" />
+                <Loader2 className="w-8 h-8 animate-spin text-melio-purple mb-4" />
                 <p className="text-gray-600">Chargement des données...</p>
               </div>
             </div>
@@ -174,7 +174,7 @@ export default function AdminDashboard() {
             <div className="space-y-6 h-full">
               {/* Key Metrics - Grille élargie */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
+                  <div className="bg-white rounded-2xl p-4 shadow-md border border-gray-200">
                     <div className="flex items-center justify-between mb-3">
                       <div className="bg-blue-100 p-2 rounded-xl">
                         <School className="w-5 h-5 text-blue-600" />
@@ -190,7 +190,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
+                  <div className="bg-white rounded-2xl p-4 shadow-md border border-gray-200">
                     <div className="flex items-center justify-between mb-3">
                       <div className="bg-green-100 p-2 rounded-xl">
                         <Users className="w-5 h-5 text-green-600" />
@@ -205,7 +205,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
+                  <div className="bg-white rounded-2xl p-4 shadow-md border border-gray-200">
                     <div className="flex items-center justify-between mb-3">
                       <div className="bg-red-100 p-2 rounded-xl">
                         <Activity className="w-5 h-5 text-red-600" />
@@ -220,7 +220,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
+                  <div className="bg-white rounded-2xl p-4 shadow-md border border-gray-200">
                     <div className="flex items-center justify-between mb-3">
                       <div className="bg-indigo-100 p-2 rounded-xl">
                         <FileText className="w-5 h-5 text-indigo-600" />
@@ -237,7 +237,7 @@ export default function AdminDashboard() {
                 </div>
 
               {/* Quick Actions */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+              <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Actions rapides</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <button
@@ -262,12 +262,12 @@ export default function AdminDashboard() {
                   </button>
                   <button
                     onClick={() => setActiveSection('reports')}
-                    className="flex items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all duration-200 border border-purple-200 hover:shadow-md"
+                    className="flex items-center p-4 bg-melio-pink-light hover:bg-melio-purple-light/50 rounded-xl transition-all duration-200 border border-melio-purple-light hover:shadow-md"
                   >
-                    <FileText className="w-6 h-6 text-purple-600 mr-3" />
+                    <FileText className="w-6 h-6 text-melio-purple mr-3" />
                     <div className="text-left">
-                      <div className="font-medium text-purple-800 text-sm">Rapports globaux</div>
-                      <div className="text-xs text-purple-600">Générer des rapports</div>
+                      <div className="font-medium text-melio-purple text-sm">Rapports globaux</div>
+                      <div className="text-xs text-melio-purple-light">Générer des rapports</div>
                     </div>
                   </button>
                 </div>

@@ -146,22 +146,22 @@ export default function StaffDashboard() {
   ];
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden">
+    <div className="flex h-screen bg-white overflow-hidden">
       {/* Sidebar - Fixe à gauche, pleine hauteur */}
-      <aside className="w-72 bg-white/80 backdrop-blur-sm border-r border-white/20 flex flex-col shadow-lg">
+      <aside className="w-72 bg-white border-r border-gray-200 flex flex-col shadow-sm">
         {/* Logo et Badge */}
-        <div className="p-6 border-b border-white/20">
+        <div className="p-6 border-b border-gray-200">
           <div className="flex items-center mb-4">
             <img src={logoIcon} alt="Melio" className="w-10 h-10 mr-3" />
             <img src={fullLogo} alt="Melio" className="h-7 w-auto" />
           </div>
-          <div className="bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 px-4 py-2 rounded-xl text-sm font-medium text-center">
+          <div className="bg-gray-100 text-gray-900 px-4 py-2 rounded-xl text-sm font-medium text-center">
             Espace Agent Social
           </div>
 
           {/* Indicateur école active */}
           <div className="mt-4">
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-gray-900 uppercase tracking-wider mb-2">
               École active
             </label>
             
@@ -170,7 +170,7 @@ export default function StaffDashboard() {
                 <select
                   value={selectedSchoolId}
                   onChange={(e) => setSelectedSchoolId(e.target.value)}
-                  className="w-full px-3 py-2 bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-300 rounded-xl text-sm font-semibold text-indigo-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition-all cursor-pointer hover:border-indigo-400"
+                  className="w-full px-3 py-2 bg-gray-50 border-2 border-gray-300 rounded-xl text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-gray-400 focus:border-gray-400 transition-all cursor-pointer hover:border-gray-400"
                 >
                   {user.schools.map((school) => (
                     <option key={school.id} value={school.id}>
@@ -182,20 +182,20 @@ export default function StaffDashboard() {
                   <p className="text-xs text-gray-500">
                     {user.schools.length} école(s) assignée(s)
                   </p>
-                  <span className="text-xs font-medium text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">
+                  <span className="text-xs font-medium text-melio-purple bg-melio-pink-light px-2 py-1 rounded-full">
                     Multi-écoles
                   </span>
                 </div>
               </>
             ) : (
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl px-4 py-3">
+              <div className="bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3">
                 <div className="flex items-center">
-                  <Building2 className="w-5 h-5 text-indigo-600 mr-2" />
+                  <Building2 className="w-5 h-5 text-gray-600 mr-2" />
                   <div>
-                    <div className="font-semibold text-sm text-indigo-800">
+                    <div className="font-semibold text-sm text-gray-900">
                       {user?.schoolName || 'École'}
                     </div>
-                    <div className="text-xs text-indigo-600">{user?.schoolCode}</div>
+                    <div className="text-xs text-gray-600">{user?.schoolCode}</div>
                   </div>
                 </div>
               </div>
@@ -240,10 +240,10 @@ export default function StaffDashboard() {
         </nav>
 
         {/* Profil Agent en bas */}
-        <div className="p-6 border-t border-white/20">
+        <div className="p-6 border-t border-gray-200">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold">
+              <div className="w-10 h-10 bg-gradient-to-br from-melio-purple to-melio-pink rounded-full flex items-center justify-center text-white font-bold">
                 {user?.name?.[0] || 'A'}
               </div>
               <div className="ml-3">
@@ -265,7 +265,7 @@ export default function StaffDashboard() {
       {/* Main Content - Utilise tout l'espace restant */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar avec titre de section */}
-        <header className="bg-white/60 backdrop-blur-sm border-b border-white/20 px-8 py-4 flex-shrink-0">
+        <header className="bg-white border-b border-gray-200 px-8 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">
@@ -280,7 +280,7 @@ export default function StaffDashboard() {
                   }
                 </p>
                 {user?.schools && user.schools.length > 1 && (
-                  <span className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-medium flex items-center">
+                  <span className="text-xs bg-melio-pink-light text-melio-purple px-3 py-1 rounded-full font-medium flex items-center">
                     <Filter className="w-3 h-3 mr-1" />
                     Données filtrées pour cette école uniquement
                   </span>

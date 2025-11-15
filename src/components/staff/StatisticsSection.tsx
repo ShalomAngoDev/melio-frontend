@@ -81,10 +81,15 @@ export default function StatisticsSection({ schoolId }: StatisticsSectionProps) 
     );
   }
 
-  const currentData = temporalStats.alerts;
-  const maxValue = Math.max(...currentData.map((d: any) => d.critical + d.high + d.medium + d.low));
+  const currentData = temporalStats?.alerts || [];
+  const maxValue = currentData.length > 0 
+    ? Math.max(...currentData.map((d: any) => (d.critical || 0) + (d.high || 0) + (d.medium || 0) + (d.low || 0)), 1)
+    : 1;
 
-  const getBarHeight = (value: number) => (value / maxValue) * 100;
+  const getBarHeight = (value: number) => {
+    if (maxValue === 0 || value === 0) return 0;
+    return Math.max((value / maxValue) * 240, 2); // 240px de hauteur max, minimum 2px pour visibilité
+  };
 
   return (
     <div className="space-y-6">
@@ -222,47 +227,56 @@ export default function StatisticsSection({ schoolId }: StatisticsSectionProps) 
             Évolution des alertes par niveau de risque
           </h3>
           
-          <div className="h-64 flex items-end justify-between space-x-2">
-            {currentData.map((data, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center">
-                <div className="w-full max-w-12 flex flex-col-reverse space-y-reverse space-y-1">
-                  {/* Critical */}
-                  {data.critical > 0 && (
-                    <div
-                      className="bg-red-500 rounded-t"
-                      style={{ height: `${getBarHeight(data.critical)}px` }}
-                      title={`${data.critical} critique(s)`}
-                    />
-                  )}
-                  {/* High */}
-                  {data.high > 0 && (
-                    <div
-                      className="bg-orange-500"
-                      style={{ height: `${getBarHeight(data.high)}px` }}
-                      title={`${data.high} élevée(s)`}
-                    />
-                  )}
-                  {/* Medium */}
-                  {data.medium > 0 && (
-                    <div
-                      className="bg-yellow-500"
-                      style={{ height: `${getBarHeight(data.medium)}px` }}
-                      title={`${data.medium} moyenne(s)`}
-                    />
-                  )}
-                  {/* Low */}
-                  {data.low > 0 && (
-                    <div
-                      className="bg-blue-500 rounded-b"
-                      style={{ height: `${getBarHeight(data.low)}px` }}
-                      title={`${data.low} faible(s)`}
-                    />
-                  )}
+          {currentData.length > 0 ? (
+            <div className="h-64 flex items-end justify-between space-x-2">
+              {currentData.map((data, index) => (
+                <div key={index} className="flex-1 flex flex-col items-center">
+                  <div className="w-full max-w-12 flex flex-col-reverse space-y-reverse space-y-1 min-h-[40px]">
+                    {/* Critical */}
+                    {data.critical > 0 && (
+                      <div
+                        className="bg-red-500 rounded-t"
+                        style={{ height: `${getBarHeight(data.critical || 0)}px` }}
+                        title={`${data.critical} critique(s)`}
+                      />
+                    )}
+                    {/* High */}
+                    {data.high > 0 && (
+                      <div
+                        className="bg-orange-500"
+                        style={{ height: `${getBarHeight(data.high || 0)}px` }}
+                        title={`${data.high} élevée(s)`}
+                      />
+                    )}
+                    {/* Medium */}
+                    {data.medium > 0 && (
+                      <div
+                        className="bg-yellow-500"
+                        style={{ height: `${getBarHeight(data.medium || 0)}px` }}
+                        title={`${data.medium} moyenne(s)`}
+                      />
+                    )}
+                    {/* Low */}
+                    {data.low > 0 && (
+                      <div
+                        className="bg-blue-500 rounded-b"
+                        style={{ height: `${getBarHeight(data.low || 0)}px` }}
+                        title={`${data.low} faible(s)`}
+                      />
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-600 mt-2">{data.label}</div>
                 </div>
-                <div className="text-xs text-gray-600 mt-2">{data.label}</div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-gray-500">
+              <div className="text-center">
+                <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Aucune donnée disponible</p>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
 
           <div className="flex justify-center space-x-4 mt-6 text-sm">
             <div className="flex items-center">
